@@ -1,5 +1,5 @@
 # Stay-loose-play-72
-A simple oker chip counting system for when you have cars but no chips
+A simple poker chip counting system for when you have cards but no chips
 
 
 Installing Supabase stuff:
@@ -18,6 +18,7 @@ create table games (
     id uuid primary key default gen_random_uuid(),
     code text unique not null,
     pot integer not null default 0,
+    buy_in integer not null default 1000,
     round integer not null default 0,
     created_at timestamptz not null default now()
 );

@@ -13,6 +13,7 @@ export default function Home() {
 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [buyIn, setBuyIn] = useState(1000);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,11 +29,12 @@ export default function Home() {
     // This gamecode can then be used to join the game
     const gameCode = generateGameCode();
 
-    // Add the new game to the DB
+    // Create the game with the selected buy-in
     const { data: game, error: gameError } = await supabase
       .from("games")
       .insert({
         code: gameCode,
+        buy_in: buyIn,
       })
       .select()
       .single();
@@ -44,13 +46,13 @@ export default function Home() {
       return;
     }
 
-    // Add this person as a player 
+    // Give the host the selected buy-in
     const { data: player, error: playerError } = await supabase
       .from("players")
       .insert({
         game_id: game.id,
         name: name.trim(),
-        chips: 1000,
+        chips: buyIn,
       })
       .select()
       .single();
@@ -86,10 +88,10 @@ export default function Home() {
 
     const gameCode = code.trim().toUpperCase();
 
-    // Query the game
+    // Get the game
     const { data: game, error: gameError } = await supabase
       .from("games")
-      .select("id")
+      .select("id, buy_in")
       .eq("code", gameCode)
       .single();
 
@@ -99,13 +101,13 @@ export default function Home() {
       return;
     }
 
-    // Add player to the game
+    // Give the joining player the game's buy-in
     const { data: player, error: playerError } = await supabase
       .from("players")
       .insert({
         game_id: game.id,
         name: name.trim(),
-        chips: 1000,
+        chips: game.buy_in,
       })
       .select()
       .single();
@@ -130,12 +132,30 @@ export default function Home() {
         <p className="subtitle">Keep track of everyone&apos;s chips even if you don&apos;t have any physical chips.</p>
 
         <label>Your name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Alex" maxLength={20}/>
+
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Alex"
+          maxLength={20}
+        />
+
+        <label>Buy-in</label>
+        <input
+          type="number"
+          value={buyIn}
+          onChange={(e) => setBuyIn(Number(e.target.value))}
+          placeholder="e.g. 1000"
+          min="1"
+        />
 
         {error && <div className="error">{error}</div>}
 
-        <button className="primary-button" onClick={createGame} disabled={loading}>
+        <button
+          className="primary-button"
+          onClick={createGame}
+          disabled={loading}
+        >
           {loading ? "Creating..." : "Create game"}
         </button>
 
@@ -144,8 +164,11 @@ export default function Home() {
         </div>
 
         <div className="join-row">
-          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="GAME CODE" maxLength={4}
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="GAME CODE"
+            maxLength={4}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 joinGame();
@@ -153,8 +176,15 @@ export default function Home() {
             }}
           />
 
-          <button className="secondary-button" onClick={joinGame} disabled={loading}>Join</button>
+          <button
+            className="secondary-button"
+            onClick={joinGame}
+            disabled={loading}
+          >
+            Join
+          </button>
         </div>
+
       </div>
     </main>
   );
