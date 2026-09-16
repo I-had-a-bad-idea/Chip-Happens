@@ -5,5 +5,6 @@ passwords.txt
 *.local
 *.env
 
+.next/
 
 node_modules/
