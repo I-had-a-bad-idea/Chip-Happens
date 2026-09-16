@@ -34,5 +34,12 @@ create index players_game_id_idx
     on players(game_id);
 ```
 
-4. Create a Vercel project
-5. Add your Supabase env variables to the project (`NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
+4. Enable realtime for the `players` table
+
+```sql
+alter publication supabase_realtime
+add table players;
+```
+
+5. Create a Vercel project
+6. Add your Supabase env variables to the project (`NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
