@@ -125,10 +125,9 @@ export default function Home() {
   return (
     <main className="home">
       <div className="home-card">
-        <div className="logo">♠</div>
 
         <h1>Stay loose play 72</h1>
-        <p className="subtitle">Keep track of everyone's chips even if you don't have any physical chips.</p>
+        <p className="subtitle">Keep track of everyone&apos;s chips even if you don&apos;t have any physical chips.</p>
 
         <label>Your name</label>
         <input value={name} onChange={(e) => setName(e.target.value)}
