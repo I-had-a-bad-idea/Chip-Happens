@@ -1,2 +1,9 @@
 # I ain't giving you my passwords
 passwords.txt 
+
+# Or my API keys
+*.local
+*.env
+
+
+node_modules/
