@@ -6,3 +6,8 @@ Installing Supabase stuff:
 ```bash
 npm install @supabase/supabase-js
 ```
+
+
+## How to deploy to prod
+1. Create a Supabase account + project
+2. Get the Supabase URL and Publishable key (Settings -- API Keys)
