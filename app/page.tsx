@@ -1,69 +1,162 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+function generateGameCode() {
+  return Math.random().toString(36).substring(2, 6).toUpperCase();
+}
 
 export default function Home() {
+  const router = useRouter();
+
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function createGame() {
+    // Check name
+    if (!name.trim()) {
+      setError("Enter your name first.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    // This gamecode can then be used to join the game
+    const gameCode = generateGameCode();
+
+    // Add the new game to the DB
+    const { data: game, error: gameError } = await supabase
+      .from("games")
+      .insert({
+        code: gameCode,
+      })
+      .select()
+      .single();
+
+    // Error handling
+    if (gameError || !game) {
+      setError(gameError?.message ?? "Could not create game.");
+      setLoading(false);
+      return;
+    }
+
+    // Add this person as a player 
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .insert({
+        game_id: game.id,
+        name: name.trim(),
+        chips: 1000,
+      })
+      .select()
+      .single();
+
+    // Error handling
+    if (playerError || !player) {
+      setError(playerError?.message ?? "Could not create player.");
+      setLoading(false);
+      return;
+    }
+
+    localStorage.setItem(`poker-player-${gameCode}`, player.id);
+
+    // Change to the game tab
+    router.push(`/game/${gameCode}`);
+  }
+  
+  async function joinGame() {
+    // Ensure all data exists
+
+    if (!name.trim()) {
+      setError("Enter your name first.");
+      return;
+    }
+
+    if (!code.trim()) {
+      setError("Enter a game code.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const gameCode = code.trim().toUpperCase();
+
+    // Query the game
+    const { data: game, error: gameError } = await supabase
+      .from("games")
+      .select("id")
+      .eq("code", gameCode)
+      .single();
+
+    if (gameError || !game) {
+      setError("Game not found.");
+      setLoading(false);
+      return;
+    }
+
+    // Add player to the game
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .insert({
+        game_id: game.id,
+        name: name.trim(),
+        chips: 1000,
+      })
+      .select()
+      .single();
+
+    if (playerError || !player) {
+      setError(playerError?.message ?? "Could not join game.");
+      setLoading(false);
+      return;
+    }
+
+    localStorage.setItem(`poker-player-${gameCode}`, player.id);
+
+    // Switch to game
+    router.push(`/game/${gameCode}`);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="home">
+      <div className="home-card">
+        <div className="logo">♠</div>
+
+        <h1>Stay loose play 72</h1>
+        <p className="subtitle">Keep track of everyone's chips even if you don't have any physical chips.</p>
+
+        <label>Your name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Alex" maxLength={20}/>
+
+        {error && <div className="error">{error}</div>}
+
+        <button className="primary-button" onClick={createGame} disabled={loading}>
+          {loading ? "Creating..." : "Create game"}
+        </button>
+
+        <div className="divider">
+          <span>or join a game</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="join-row">
+          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="GAME CODE" maxLength={4}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                joinGame();
+              }
+            }}
+          />
+
+          <button className="secondary-button" onClick={joinGame} disabled={loading}>Join</button>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
