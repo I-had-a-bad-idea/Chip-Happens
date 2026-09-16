@@ -26,6 +26,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [chipAmount, setChipAmount] = useState(100);
 
   async function loadGame() {
     const gameCode = code.toUpperCase();
@@ -210,29 +211,28 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
               <div className="chip-controls">
                 <button
-                  onClick={() => changeChips(player.id, -100)}
+                onClick={() => changeChips(player.id, -chipAmount)}
                 >
-                  −100
+                −
                 </button>
 
-                <button
-                  onClick={() => changeChips(player.id, -25)}
-                >
-                  −25
-                </button>
+                <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={chipAmount}
+                    onChange={(e) => {
+                    const value = Number(e.target.value);
+                    setChipAmount(value > 0 ? value : 1);
+                    }}
+                />
 
                 <button
-                  onClick={() => changeChips(player.id, 25)}
+                onClick={() => changeChips(player.id, chipAmount)}
                 >
-                  +25
+                +
                 </button>
-
-                <button
-                  onClick={() => changeChips(player.id, 100)}
-                >
-                  +100
-                </button>
-              </div>
+            </div>
 
               <button
                 className="remove-button"
