@@ -264,8 +264,20 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     const activePlayers = updatedPlayers.filter((p) => p.active);
     const playersInHand = activePlayers.filter((p) => !p.folded);
-    if (playersInHand.length <= 1) {
-      await progressToNextBettingRound();
+    if (playersInHand.length === 1) {
+      // const winner = playersInHand[0]; // last remaining player wins
+
+      // Switch to showdown so host can select the last player as the winner
+      const {error} = await supabase
+        .from("games")
+        .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
+        .eq("id", game.id);
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
       return;
     }
     const currentIndex = playersInHand.findIndex((p) => p.id === currentPlayerId);
