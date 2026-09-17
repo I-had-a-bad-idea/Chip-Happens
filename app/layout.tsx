@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stay loose play 72",
+  title: "Chip Happens",
   description: "A simple poker chip counting system for when you have cards but no chips",
 };
 

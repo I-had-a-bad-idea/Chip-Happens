@@ -128,7 +128,7 @@ export default function Home() {
     <main className="home">
       <div className="home-card">
 
-        <h1>Stay loose play 72</h1>
+        <h1>Chip Happens</h1>
         <p className="subtitle">Keep track of everyone&apos;s chips even if you don&apos;t have any physical chips.</p>
 
         <label>Your name</label>

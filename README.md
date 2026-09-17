@@ -1,12 +1,23 @@
-# Stay-loose-play-72
-A simple poker chip counting system for when you have cards but no chips
+# Chip-Happens
+A simple poker chip counting system for when you have cards but no chips.
 
+Find the prod deployment here:
+https://chip-happens.vercel.app/
 
-Installing Supabase stuff:
+## Locally
+
+Get the environemnt keys for the Supabase DB and put them in `.env.local`.
+
+Installing Dependencies
 ```bash
-npm install @supabase/supabase-js
+npm install .
 ```
 
+Running:
+
+```bash
+npm run dev
+```
 
 ## How to deploy to prod
 1. Create a Supabase account + project
