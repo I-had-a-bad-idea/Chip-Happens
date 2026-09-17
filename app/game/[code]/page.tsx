@@ -9,6 +9,7 @@ type Player = {
   game_id: string;
   name: string;
 
+  active: boolean;
   chips: number;
   current_bet: number;
   has_acted: boolean;
@@ -21,10 +22,13 @@ type Game = {
   id: string;
   code: string;
 
-  pot: number;
   buy_in: number;
+  small_blind: number;
+  big_blind: number;
+  
   host: string | null; // the player ID of the host
 
+  pot: number;
   current_dealer: string | null;
   betting_round: number; // Preflop, Flop, Turn, River
   current_bet: number;
@@ -111,6 +115,67 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
+  async function startNewHand() {
+    if (!game || players.length < 2) return;
+
+    const activePlayers = players.filter((p) => p.active);
+    const playersInHand = activePlayers.filter((p) => !p.folded);
+    
+    if (playersInHand.length < 2) return;
+
+    const dealerIndex = playersInHand.findIndex((p) => p.id === game.current_dealer);
+    // Dealer moves one seat
+    const newDealerIndex = dealerIndex === -1 ? 0
+    : (dealerIndex + 1) % playersInHand.length;
+
+    const dealer = playersInHand[newDealerIndex];
+    // Small blind is player after dealer
+    const smallBlindPlayer = playersInHand[(newDealerIndex + 1) % playersInHand.length];
+    // Big blind is after small blind
+    const bigBlindPlayer = playersInHand[(newDealerIndex + 2) % playersInHand.length];
+    // First player to act is after the big blind
+    const underTheGunPlayer = activePlayers[(newDealerIndex + 3) % activePlayers.length];
+
+    // Don't allow the blinds to go into debt
+    const smallBlindAmount = Math.min(game.small_blind, smallBlindPlayer.chips);
+    const bigBlindAmount = Math.min(game.big_blind, bigBlindPlayer.chips);
+
+      // Update players
+    const { error: smallBlindError } = await supabase
+      .from("players")
+      .update({chips: smallBlindPlayer.chips - smallBlindAmount, current_bet: smallBlindAmount,})
+      .eq("id", smallBlindPlayer.id);
+
+    if (smallBlindError) {
+      setError(smallBlindError.message);
+      return;
+    }
+
+    const { error: bigBlindError } = await supabase
+      .from("players")
+      .update({chips: bigBlindPlayer.chips - bigBlindAmount, current_bet: bigBlindAmount,})
+      .eq("id", bigBlindPlayer.id);
+
+    if (bigBlindError) {
+      setError(bigBlindError.message);
+      return;
+    }
+
+    // Add blinds to pot
+    const blindPot = smallBlindAmount + bigBlindAmount;
+    const { error: gameError } = await supabase
+      .from("games")
+      .update({pot: blindPot, current_bet: bigBlindAmount, current_dealer: dealer.id, current_player: underTheGunPlayer.id,})
+      .eq("id", game.id);
+
+    if (gameError) {
+      setError(gameError.message);
+      return;
+    }
+
+    await loadGame();
+  }
+
   async function progressToNextBettingRound() {
     if (!game) return;
 
@@ -157,19 +222,20 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   async function progressToNextPlayer(currentPlayerId: string, currentBet: number, updatedPlayers: Player[] = players) {
     if (!game) return;
 
-    const activePlayers = updatedPlayers.filter((p) => !p.folded);
-    if (activePlayers.length <= 1) {
+    const activePlayers = updatedPlayers.filter((p) => p.active);
+    const playersInHand = activePlayers.filter((p) => !p.folded);
+    if (playersInHand.length <= 1) {
       await progressToNextBettingRound();
       return;
     }
-    const currentIndex = activePlayers.findIndex((p) => p.id === currentPlayerId);
+    const currentIndex = playersInHand.findIndex((p) => p.id === currentPlayerId);
 
     if (currentIndex === -1 ) return;
 
 
     // Look for the next active player who has not matched the current bet or still needs to act
-    for (let i = 1; i <= activePlayers.length; i++) {
-      const nextPlayer = activePlayers[(currentIndex + i) % activePlayers.length];
+    for (let i = 1; i <= playersInHand.length; i++) {
+      const nextPlayer = playersInHand[(currentIndex + i) % playersInHand.length];
 
       if (nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) {
         const { error } = await supabase
@@ -344,6 +410,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     
     // Update local copy of the players state
     setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
+
+    await startNewHand();
   }
 
   async function chooseWinner(winnerId: string) {
@@ -362,8 +430,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    if (winner.folded) {
-      setError("Cannot choose a folded player as the winner.");
+    if (winner.folded || !winner.active) {
+      setError("Cannot choose a folded or inactive player as the winner.");
       return;
     }
 
@@ -379,7 +447,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
     // Reset the game for the next round
-
     await resetGame();
   }
     
@@ -401,10 +468,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const pot = game?.pot ?? 0;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
-  const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded;
+  const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded && currentPlayer?.active;
   const isHost = currentPlayerId === game?.host;
   const isShowdown = game?.betting_round === BETTING_ROUND_NAMES.length - 1;
-  const activePlayers = players.filter((p) => !p.folded);
+  
+  const activePlayers = players.filter((p) => p.active);
+  const playersInHand = activePlayers.filter((p) => !p.folded);
 
   if (loading) {
     return (
@@ -474,7 +543,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         {isShowdown && isHost && (
           <div className="winner-picker">
             <h2>Choose the winner</h2>
-            {activePlayers.map((player) => (
+            {playersInHand.map((player) => (
               <button
                 key={player.id}
                 className="winner-button"

@@ -53,6 +53,7 @@ create table players (
     game_id uuid not null references games(id) on delete cascade,
     name text not null,
 
+    active boolean not null default true,
     chips integer not null default 0,
     current_bet integer not null default 0,
     has_acted boolean not null default false,
