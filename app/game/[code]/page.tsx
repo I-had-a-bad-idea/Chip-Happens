@@ -80,6 +80,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     setLoading(false);
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => {loadGame();}, [code]);
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       .subscribe();
 
     return () => {supabase.removeChannel(channel);};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
   async function call() {
@@ -199,7 +201,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   }
 
   function copyCode() {navigator.clipboard.writeText(code.toUpperCase());}
-  const totalChips = players.reduce((total, player) => total + player.chips,0);
+  const pot = game?.pot ?? 0;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded;
@@ -253,8 +255,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       <section className="summary">
         <div>
-          <span>Total chips</span>
-          <strong>{totalChips.toLocaleString()}</strong>
+          <span>Pot</span>
+          <strong>{pot.toLocaleString()}</strong>
         </div>
 
         <div>
@@ -291,7 +293,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 </div>
 
               </div>
-            {isMe && (
+            {(isMe && isMyTurn) &&  (
             <div className="poker-actions">
               <button
                 className="fold-button"
