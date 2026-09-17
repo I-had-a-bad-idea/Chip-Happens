@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 function generateGameCode() {
-  return Math.random().toString(36).substring(2, 8).toUpperCase();
+  return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
 export default function Home() {
@@ -157,7 +157,7 @@ export default function Home() {
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="GAME CODE"
-            maxLength={6}
+            maxLength={4}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 joinGame();
