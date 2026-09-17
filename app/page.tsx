@@ -64,6 +64,18 @@ export default function Home() {
       return;
     }
 
+    // Set the current dealer for the game to the host player
+    const { error: dealerError } = await supabase
+      .from("games")
+      .update({ dealer_id: player.id })
+      .eq("id", game.id);
+
+    if (dealerError) {
+      setError(dealerError.message ?? "Could not set dealer.");
+      setLoading(false);
+      return;
+    }
+
     localStorage.setItem(`poker-player-${gameCode}`, player.id);
 
     // Change to the game tab
