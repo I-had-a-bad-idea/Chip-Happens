@@ -168,7 +168,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     const activePlayers = updatedPlayers.filter((p) => !p.folded);
     if (activePlayers.length <= 1) {
-      progressToNextBettingRound();
+      await progressToNextBettingRound();
       return;
     }
     const currentIndex = activePlayers.findIndex((p) => p.id === currentPlayerId);
@@ -196,10 +196,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     // Everyone has matched the current bet, progress to next betting round
-    progressToNextBettingRound();
+    await progressToNextBettingRound();
   }
 
   async function setPlayerHasActed(playerId: string, has_acted: boolean) {
+    // Update local copy of the players state
+    setPlayers((prevPlayers) => prevPlayers.map((p) => (p.id === playerId ? { ...p, has_acted } : p)));
     const { error } = await supabase
       .from("players")
       .update({ has_acted })
@@ -208,8 +210,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (error) {
       setError(error.message);
     }
-    // Update local copy of the players state
-    setPlayers((prevPlayers) => prevPlayers.map((p) => (p.id === playerId ? { ...p, has_acted } : p)));
   }
 
   async function call() {
@@ -245,8 +245,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // Update our local copy so progressToNextPlayer has the new bet.
     const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, chips: newChipCount, current_bet: game.current_bet} : p);
     // Mark the player as having acted
-    setPlayerHasActed(currentPlayerId, true);
-    progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+    await setPlayerHasActed(currentPlayerId, true);
+    await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
   }
 
   async function fold() {
@@ -265,8 +265,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // Update our local copy so progressToNextPlayer has the new bet.
     const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, folded: true} : p);
     // Mark the player as having acted
-    setPlayerHasActed(currentPlayerId, true);
-    progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+    await setPlayerHasActed(currentPlayerId, true);
+    await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
   }
 
   async function check() {
@@ -275,8 +275,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // No DB update needed for checking, just move to the next player
     
     // Mark the player as having acted
-    setPlayerHasActed(currentPlayerId, true);
-    progressToNextPlayer(currentPlayerId, game.current_bet, players);
+    await setPlayerHasActed(currentPlayerId, true);
+    await progressToNextPlayer(currentPlayerId, game.current_bet, players);
   }
 
   async function raise(raise_amount: number) {
@@ -310,8 +310,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // Update our local copy so progressToNextPlayer has the new bet.
     const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, chips: newChipCount, current_bet: newCurrentBet} : p);
     // Mark the player as having acted
-    setPlayerHasActed(currentPlayerId, true);
-    progressToNextPlayer(currentPlayerId, newCurrentBet, updatedPlayers);
+    await setPlayerHasActed(currentPlayerId, true);
+    await progressToNextPlayer(currentPlayerId, newCurrentBet, updatedPlayers);
   }
 
   async function resetGame() {
@@ -381,7 +381,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
     // Reset the game for the next round
 
-    resetGame();
+    await resetGame();
   }
     
 
