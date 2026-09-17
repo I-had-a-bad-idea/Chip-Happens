@@ -643,7 +643,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 Fold
               </button>
 
-              {game.current_bet === 0 ? (
+              {game.current_bet === 0 || player.current_bet === game.current_bet ? (
                 <button
                   className="check-button"
                   onClick={check}
