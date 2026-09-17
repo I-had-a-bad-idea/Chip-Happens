@@ -107,6 +107,45 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
+  async function progressToNextPlayer() {
+    if (!game || !game.current_player) return;
+
+    const activePlayers = players.filter((p) => !p.folded);
+    const currentIndex = activePlayers.findIndex((p) => p.id === currentPlayerId);
+
+    if (currentIndex === -1 || activePlayers.length === 0) {
+      return null;
+    }
+
+    if (currentIndex + 1 >= activePlayers.length) {
+      // If the current player is the last in the list, proceed to the next round (Flop, Turn, River, Showdown)
+      const nextRound = game.round + 1;
+      const { error } = await supabase
+        .from("games")
+        .update({ round: nextRound, current_player: null })
+        .eq("id", game.id);
+
+      if (error) {
+        setError(error.message);
+      }
+
+      return;
+    }
+
+    const nextPlayer = activePlayers[(currentIndex + 1) % activePlayers.length];
+
+    if (!nextPlayer) return;
+
+    const { error } = await supabase
+      .from("games")
+      .update({ current_player: nextPlayer.id })
+      .eq("id", game.id);
+    
+    if (error) {
+      setError(error.message);
+    }
+  }
+
   async function call() {
     if (!game || !currentPlayerId) return;
 
@@ -136,6 +175,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (pot_error) {
       setError(pot_error.message);
     }
+
+    progressToNextPlayer();
   }
 
   async function fold() {
@@ -150,13 +191,15 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (player_error) {
       setError(player_error.message);
     }
+
+    progressToNextPlayer();
   }
 
   async function check() {
     if (!game || !currentPlayerId) return;
 
     // No DB update needed for checking, just move to the next player
-    // TODO: make logic for moving to the next player
+    progressToNextPlayer();
   }
 
   async function raise(raise_amount: number) {
@@ -185,6 +228,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (pot_error) {
       setError(pot_error.message);
     }
+
+    progressToNextPlayer();
   }
 
   async function removePlayer(playerId: string) {
