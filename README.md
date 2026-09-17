@@ -34,9 +34,11 @@ create table games (
     code text unique not null,
 
     buy_in integer not null default 1000,
+    host uuid,
     
     current_dealer uuid,
-    round integer not null default 0,
+    betting_round integer not null default 0,
+    pot integer not null default 0,
     current_bet integer not null default 0,
     current_player uuid,
 

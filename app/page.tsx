@@ -64,10 +64,10 @@ export default function Home() {
       return;
     }
 
-    // Set the current dealer for the game to the host player
+    // Set the current dealer for the game to the host player and set the current player as the host of the game
     const { error: dealerError } = await supabase
       .from("games")
-      .update({ current_dealer: player.id, current_player: player.id }) // TODO: Don't just set the current player to the host
+      .update({ host: player.id, current_dealer: player.id, current_player: player.id }) // TODO: Don't just set the current player to the host
       .eq("id", game.id);
 
     if (dealerError) {
