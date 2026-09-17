@@ -109,7 +109,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (!game || !currentPlayerId) return;
 
     const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
-    const newChipCount = currentChipCount - game.current_bet;
+    const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
+    const chipsToCall = game.current_bet - currentBet;
+    if (chipsToCall <= 0) return; // No need to call if already matched
+    const newChipCount = currentChipCount - chipsToCall;
     
     // Update the player's chips in the DB
     const { error: player_error } = await supabase
@@ -122,7 +125,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     // Update the pot in the game
-    const newPot = game.pot + game.current_bet;
+    const newPot = game.pot + chipsToCall;
     const { error: pot_error } = await supabase
       .from("games")
       .update({ pot: newPot })
