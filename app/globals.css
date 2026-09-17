@@ -65,7 +65,8 @@ h1 {
 
 label {
   display: block;
-  margin-bottom: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
   font-size: 14px;
   color: #b8bdc8;
 }

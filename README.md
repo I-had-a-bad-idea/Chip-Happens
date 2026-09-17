@@ -32,9 +32,12 @@ drop table if exists games;
 create table games (
     id uuid primary key default gen_random_uuid(),
     code text unique not null,
+    host uuid,
 
     buy_in integer not null default 1000,
-    host uuid,
+
+    small_blind integer not null default 10,
+    big_blind integer not null default 20,
     
     current_dealer uuid,
     betting_round integer not null default 0,

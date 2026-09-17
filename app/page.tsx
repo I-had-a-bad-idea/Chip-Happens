@@ -14,6 +14,8 @@ export default function Home() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [buyIn, setBuyIn] = useState(1000);
+  const [smallBlind, setSmallBlind] = useState(10);
+  const [bigBlind, setBigBlind] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,12 +31,14 @@ export default function Home() {
     // This gamecode can then be used to join the game
     const gameCode = generateGameCode();
 
-    // Create the game with the selected buy-in
+    // Create the game with the selected buy-in and blinds
     const { data: game, error: gameError } = await supabase
       .from("games")
       .insert({
         code: gameCode,
         buy_in: buyIn,
+        small_blind: smallBlind,
+        big_blind: bigBlind
       })
       .select()
       .single();
@@ -158,6 +162,22 @@ export default function Home() {
           value={buyIn}
           onChange={(e) => setBuyIn(Number(e.target.value))}
           placeholder="e.g. 1000"
+          min="1"
+        />
+        <label>Small blind</label>
+        <input
+          type="number"
+          value={smallBlind}
+          onChange={(e) => setSmallBlind(Number(e.target.value))}
+          placeholder="e.g. 10"
+          min="1"
+        />
+        <label>Big blind</label>
+        <input
+          type="number"
+          value={bigBlind}
+          onChange={(e) => setBigBlind(Number(e.target.value))}
+          placeholder="e.g. 20"
           min="1"
         />
 
