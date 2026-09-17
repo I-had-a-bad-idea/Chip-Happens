@@ -45,7 +45,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
-  const [showWinnerPicker, setShowWinnerPicker] = useState(false);
 
   async function loadGame() {
     const gameCode = code.toUpperCase();
@@ -120,7 +119,17 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     
     if (nextBettingRound > BETTING_ROUND_NAMES.length - 1) {
       // TODO: Aks who won the game round and reset the game for the next round
-      
+          
+      // Update the game state in the DB
+      const { error } = await supabase
+        .from("games")
+        .update({ betting_round: nextBettingRound, current_bet: 0, current_player: null })
+        .eq("id", game.id);
+      if (error) {
+        setError(error.message);
+      }
+      // Update local copy of the game state
+      setGame((prevGame) => prevGame ? { ...prevGame, betting_round: nextBettingRound, current_bet: 0, current_player: null } : null);
     }
     
     // Update the game state in the DB
@@ -395,6 +404,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded;
   const isHost = currentPlayerId === game?.host;
+  const isShowdown = game?.betting_round === BETTING_ROUND_NAMES.length - 1;
+  const activePlayers = players.filter((p) => !p.folded);
 
   if (loading) {
     return (
@@ -459,6 +470,23 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
           <strong>{players.length}</strong>
         </div>
       </section>
+
+      <div className="winner-selection">
+        {isShowdown && isHost && (
+          <div className="winner-picker">
+            <h2>Choose the winner</h2>
+            {activePlayers.map((player) => (
+              <button
+                key={player.id}
+                className="winner-button"
+                onClick={() => chooseWinner(player.id)}
+              >
+                {player.name} ({player.chips.toLocaleString()} chips)
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <section className="players">
         {players.map((player) => {
@@ -537,13 +565,14 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
               </button>
             </div>
           )}
-
-              <button
-                className="remove-button"
-                onClick={() => removePlayer(player.id)}
-              >
-                Remove player
-              </button>
+          {isHost && (
+            <button
+              className="remove-button"
+              onClick={() => removePlayer(player.id)}
+            >
+            Remove player
+            </button>
+          )}
             </article>
           );
         })}
