@@ -618,9 +618,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
               Invite
             </button>
 
-            <div className="copy-hint">Tap to copy</div>
           </div>
-
+          <div className="copy-hint">Tap to copy</div>
         </div>
 
         <button
