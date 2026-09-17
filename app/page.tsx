@@ -85,59 +85,14 @@ export default function Home() {
     // Change to the game tab
     router.push(`/game/${gameCode}`);
   }
-  
-  async function joinGame() {
-    // Ensure all data exists
 
-    if (!name.trim()) {
-      setError("Enter your name first.");
-      return;
-    }
-
+  function joinGame() {
     if (!code.trim()) {
       setError("Enter a game code.");
       return;
     }
 
-    setLoading(true);
-    setError("");
-
-    const gameCode = code.trim().toUpperCase();
-
-    // Get the game
-    const { data: game, error: gameError } = await supabase
-      .from("games")
-      .select("id, buy_in")
-      .eq("code", gameCode)
-      .single();
-
-    if (gameError || !game) {
-      setError("Game not found.");
-      setLoading(false);
-      return;
-    }
-
-    // Give the joining player the game's buy-in
-    const { data: player, error: playerError } = await supabase
-      .from("players")
-      .insert({
-        game_id: game.id,
-        name: name.trim(),
-        chips: game.buy_in,
-      })
-      .select()
-      .single();
-
-    if (playerError || !player) {
-      setError(playerError?.message ?? "Could not join game.");
-      setLoading(false);
-      return;
-    }
-
-    localStorage.setItem(`poker-player-${gameCode}`, player.id);
-
-    // Switch to game
-    router.push(`/game/${gameCode}`);
+    router.push(`/join/${code.trim().toUpperCase()}`);
   }
 
   return (
@@ -155,6 +110,8 @@ export default function Home() {
           placeholder="e.g. Alex"
           maxLength={20}
         />
+
+        <h2>Create a game</h2>
 
         <label>Buy-in</label>
         <input
