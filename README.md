@@ -39,6 +39,7 @@ create table games (
     small_blind integer not null default 10,
     big_blind integer not null default 20,
     
+    status text not null default 'waiting',
     current_dealer uuid,
     betting_round integer not null default 0,
     pot integer not null default 0,

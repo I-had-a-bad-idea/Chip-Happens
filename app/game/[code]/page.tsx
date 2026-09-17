@@ -28,6 +28,7 @@ type Game = {
   
   host: string | null; // the player ID of the host
 
+  status: "waiting" | "playing";
   pot: number;
   current_dealer: string | null;
   betting_round: number; // Preflop, Flop, Turn, River
@@ -115,7 +116,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
-  async function startNewHand() {
+  async function startNewHand(first_hand: boolean) {
     if (!game || players.length < 2) return;
 
     const activePlayers = players.filter((p) => p.active);
@@ -124,9 +125,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (playersInHand.length < 2) return;
 
     const dealerIndex = playersInHand.findIndex((p) => p.id === game.current_dealer);
-    // Dealer moves one seat
-    const newDealerIndex = dealerIndex === -1 ? 0
-    : (dealerIndex + 1) % playersInHand.length;
+    
+    let newDealerIndex = dealerIndex;
+    if (!first_hand) {
+      // Dealer moves one seat
+      newDealerIndex = dealerIndex === -1 ? 0 : (dealerIndex + 1) % playersInHand.length;
+    }
 
     const dealer = playersInHand[newDealerIndex];
     // Small blind is player after dealer
@@ -165,7 +169,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     const blindPot = smallBlindAmount + bigBlindAmount;
     const { error: gameError } = await supabase
       .from("games")
-      .update({pot: blindPot, current_bet: bigBlindAmount, current_dealer: dealer.id, current_player: underTheGunPlayer.id,})
+      .update({pot: blindPot, current_bet: bigBlindAmount, status: "playing", current_dealer: dealer.id, current_player: underTheGunPlayer.id,})
       .eq("id", game.id);
 
     if (gameError) {
@@ -174,6 +178,22 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     await loadGame();
+  }
+
+  async function startGame() {
+    if (!game || !isHost) return;
+    if (game.status != "waiting") return;
+
+    const activePlayers = players.filter((p) => p.active);
+    
+    if (activePlayers.length < 2) {
+      setError("You need at least 2 active players to start.");
+      return;
+    }
+
+    setError("");
+
+    await startNewHand(true);
   }
 
   async function progressToNextBettingRound() {
@@ -411,7 +431,9 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // Update local copy of the players state
     setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
 
-    await startNewHand();
+    if (game.status == "playing") { 
+      await startNewHand(false);
+    } 
   }
 
   async function chooseWinner(winnerId: string) {
@@ -539,8 +561,32 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         </div>
       </section>
 
+      {game.status === "waiting" && (
+        <section className="waiting-section">
+          <h2>Waiting for host to start game</h2>
+
+          <p>
+            {players.filter((p) => p.active).length} active players
+          </p>
+
+          {isHost && (
+            <div>
+              <p>Start the game, when everyone has joined</p>
+
+              <button
+                className="start-game-button"
+                onClick={startGame}
+                disabled={players.filter((p) => p.active).length < 2}
+              >
+                Start Game
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="winner-selection">
-        {isShowdown && isHost && (
+        {game.status === "playing"  && isShowdown && isHost && (
           <div className="winner-picker">
             <h2>Choose the winner</h2>
             {playersInHand.map((player) => (
@@ -574,10 +620,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                     {isMe && (
                       <span className="player-badge">YOU</span>
                     )}
-                    {(isMe && isMyTurn) && (
+                    {(game.status === "playing" && isMe && isMyTurn) && (
                       <span className="player-badge">YOUR TURN</span>
                     )}
-                    {(!isMe && isCurrentPlayer) && (
+                    {(game.status === "playing" && !isMe && isCurrentPlayer) && (
                       <span className="player-badge">Thinking about going all-in...</span>
                     )}
                   </div>
@@ -588,7 +634,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 </div>
 
               </div>
-            {(isMe && isMyTurn) &&  (
+            {game.status === "playing" && isMe && isMyTurn &&  (
             <div className="poker-actions">
               <button
                 className="fold-button"
