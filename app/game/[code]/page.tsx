@@ -171,7 +171,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     // Update the pot and current bet in the game
-    const newPot = game.pot + raise_amount - ;
+    const newPot = game.pot + raise_amount ;
     const { error: pot_error } = await supabase
       .from("games")
       .update({ pot: newPot, current_bet: game.current_bet + raise_amount })
@@ -301,31 +301,51 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 </div>
 
               </div>
+            {isMe && (
+            <div className="poker-actions">
+              <button
+                className="fold-button"
+                onClick={fold}
+              >
+                Fold
+              </button>
 
-              <div className="chip-controls">
+              {game.current_bet === 0 ? (
                 <button
-                onClick={() => changeChips(player.id, -chipAmount)}
+                  className="check-button"
+                  onClick={check}
                 >
-                −
+                  Check
                 </button>
+              ) : (
+                <button
+                  className="call-button"
+                  onClick={call}
+                  disabled={player.chips < game.current_bet}
+                >
+                  Call {game.current_bet}
+                </button>
+              )}
 
-                <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={chipAmount}
-                    onChange={(e) => {
-                    const value = Number(e.target.value);
-                    setChipAmount(value > 0 ? value : 1);
-                    }}
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={chipAmount}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setChipAmount(value > 0 ? value : 1);
+                }}
                 />
-
-                <button
-                onClick={() => changeChips(player.id, chipAmount)}
-                >
-                +
-                </button>
+              <button
+                className="raise-button"
+                onClick={() => raise(chipAmount)}
+                disabled={player.chips < chipAmount}
+              >
+                Raise {chipAmount}
+              </button>
             </div>
+          )}
 
               <button
                 className="remove-button"

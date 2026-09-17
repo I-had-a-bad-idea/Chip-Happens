@@ -266,14 +266,14 @@ input:focus {
   font-size: 13px;
 }
 
-.chip-controls {
+.poker-actions {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 16px;
 }
 
-.chip-controls button {
+.poker-actions button {
   border: 0;
   border-radius: 6px;
   padding: 11px 4px;
@@ -281,7 +281,7 @@ input:focus {
   color: #e4e6eb;
 }
 
-.chip-controls button:active {
+.poker-actions button:active {
   background: #3a404c;
 }
 
@@ -318,7 +318,7 @@ input:focus {
     padding: 18px;
   }
 
-  .chip-controls button {
+  .poker-actions button {
     font-size: 13px;
   }
 }
