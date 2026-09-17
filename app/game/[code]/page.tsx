@@ -665,6 +665,9 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                   <div className="chip-count">
                     {player.chips.toLocaleString()}
                   </div>
+                  <div className="current-bet">
+                    Current bet:  {player.current_bet.toLocaleString()}
+                  </div>
                 </div>
 
               </div>
@@ -690,7 +693,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                   onClick={call}
                   disabled={player.chips < game.current_bet}
                 >
-                  Call {game.current_bet}
+                  Call {game.current_bet - player.current_bet}
                 </button>
               )}
 
