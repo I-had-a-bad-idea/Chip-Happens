@@ -553,6 +553,22 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   }
 
   function copyCode() {navigator.clipboard.writeText(code.toUpperCase());}
+
+  async function invitePlayers() {
+    const inviteURL = `${window.location.origin}/join/${game?.code.toUpperCase()}`;
+
+    if (navigator.share) {
+      await navigator.share({
+        title: "Join my Chip Happens room",
+        text: `Join my Chip Happens room with code ${game?.code.toUpperCase()}`,
+        url: inviteURL
+      });
+    } else {
+      await navigator.clipboard.writeText(inviteURL);
+      alert("Invite link copied");
+    }
+  }
+
   const pot = game?.pot ?? 0;
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
@@ -593,11 +609,18 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         <div>
           <div className="small-label">GAME</div>
 
-          <button className="game-code" onClick={copyCode}>
-            {game.code}
-          </button>
+          <div className="game-code-row">
+            <button className="game-code" onClick={copyCode}>
+              {game.code}
+            </button>
 
-          <div className="copy-hint">Tap to copy</div>
+            <button className="invite-button" onClick={invitePlayers}>
+              Invite
+            </button>
+
+            <div className="copy-hint">Tap to copy</div>
+          </div>
+
         </div>
 
         <button
