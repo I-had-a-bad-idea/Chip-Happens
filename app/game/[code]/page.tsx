@@ -8,14 +8,29 @@ type Player = {
   id: string;
   game_id: string;
   name: string;
+
   chips: number;
+  current_bet: number;
+  folded: boolean;
+
   created_at: string;
 };
 
 type Game = {
   id: string;
   code: string;
+
+  pot: number;
+  buy_in: number;
+
+  current_dealer: string | null;
+  round: number; // Preflop, Flop, Turn, River
+  current_bet: number;
+  current_player: string | null;
+
+  created_at: string
 };
+
 
 export default function GamePage({params,}: {params: Promise<{ code: string }>;}) {
   const { code } = use(params);
@@ -89,6 +104,84 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     return () => {supabase.removeChannel(channel);};
   }, [game?.id]);
+
+  async function call() {
+    if (!game || !currentPlayerId) return;
+
+    const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
+    const newChipCount = currentChipCount - game.current_bet;
+    
+    // Update the player's chips in the DB
+    const { error: player_error } = await supabase
+      .from("players")
+      .update({ chips: newChipCount, current_bet: game.current_bet })
+      .eq("id", currentPlayerId);
+
+    if (player_error) {
+      setError(player_error.message);
+    }
+
+    // Update the pot in the game
+    const newPot = game.pot + game.current_bet;
+    const { error: pot_error } = await supabase
+      .from("games")
+      .update({ pot: newPot })
+      .eq("id", game.id);
+
+    if (pot_error) {
+      setError(pot_error.message);
+    }
+  }
+
+  async function fold() {
+    if (!game || !currentPlayerId) return;
+    
+    // Update the player's folded status in the DB
+    const { error: player_error } = await supabase
+      .from("players")
+      .update({ folded: true })
+      .eq("id", currentPlayerId);
+
+    if (player_error) {
+      setError(player_error.message);
+    }
+  }
+
+  async function check() {
+    if (!game || !currentPlayerId) return;
+
+    // No DB update needed for checking, just move to the next player
+    // TODO: make logic for moving to the next player
+  }
+
+  async function raise(raise_amount: number) {
+    if (!game || !currentPlayerId) return;
+
+    const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
+    const newChipCount = currentChipCount - raise_amount;
+
+    // Update the player's chips in the DB
+    const { error: player_error } = await supabase
+      .from("players")
+      .update({ chips: newChipCount, current_bet: game.current_bet + raise_amount })
+      .eq("id", currentPlayerId);
+
+    if (player_error) {
+      setError(player_error.message);
+    }
+
+    // Update the pot and current bet in the game
+    const newPot = game.pot + raise_amount - ;
+    const { error: pot_error } = await supabase
+      .from("games")
+      .update({ pot: newPot, current_bet: game.current_bet + raise_amount })
+      .eq("id", game.id);
+
+    if (pot_error) {
+      setError(pot_error.message);
+    }
+  }
+
 
   async function changeChips(playerId: string, amount: number) {
     // Check if player exists
