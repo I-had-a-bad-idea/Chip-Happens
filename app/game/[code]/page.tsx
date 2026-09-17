@@ -23,6 +23,7 @@ type Game = {
 
   pot: number;
   buy_in: number;
+  host: string | null; // the player ID of the host
 
   current_dealer: string | null;
   betting_round: number; // Preflop, Flop, Turn, River
@@ -44,6 +45,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
+  const [showWinnerPicker, setShowWinnerPicker] = useState(false);
 
   async function loadGame() {
     const gameCode = code.toUpperCase();
@@ -303,6 +305,77 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     progressToNextPlayer(currentPlayerId, newCurrentBet, updatedPlayers);
   }
 
+  async function resetGame() {
+    if (!game) return;
+    
+    const { error : gameError } = await supabase
+      .from("games")
+      .update({ pot: 0, betting_round: 0, current_bet: 0, current_player: game.current_dealer })
+      .eq("id", game.id);
+    
+    if (gameError) {
+      setError(gameError.message);
+      return;
+    }
+
+    // Reset each player's current bet, folded status, and has_acted status
+    for (const player of players) {
+      const { error: playerError } = await supabase
+        .from("players")
+        .update({ current_bet: 0, folded: false, has_acted: false })
+        .eq("id", player.id);
+
+      if (playerError) {
+        setError(playerError.message);
+        return;
+      }
+    }
+
+    // Update local copy of the game state
+    setGame((prevGame) => prevGame ? { ...prevGame, pot: 0, betting_round: 0, current_bet: 0, current_player: prevGame.current_dealer } : null);
+    
+    // Update local copy of the players state
+    setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
+  }
+
+  async function chooseWinner(winnerId: string) {
+    if (!game) return;
+
+    // Only host can choose the winner
+    if (currentPlayerId !== game.host) {
+      setError("Only the host can choose the winner.");
+      return;
+    }
+
+    // Get the winner
+    const winner = players.find((p) => p.id === winnerId);
+    if (!winner) {
+      setError("Winner not found.");
+      return;
+    }
+
+    if (winner.folded) {
+      setError("Cannot choose a folded player as the winner.");
+      return;
+    }
+
+    // Update the winner's chips in the DB
+    const newChipCount = winner.chips + game.pot;
+    const { error: player_error } = await supabase
+      .from("players")
+      .update({ chips: newChipCount })
+      .eq("id", winnerId);
+
+    if (player_error) {
+      setError(player_error.message);
+      return;
+    }
+    // Reset the game for the next round
+
+    resetGame();
+  }
+    
+
   async function removePlayer(playerId: string) {
     if (!window.confirm("Remove this player?")) return;
 
@@ -321,6 +394,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded;
+  const isHost = currentPlayerId === game?.host;
 
   if (loading) {
     return (
