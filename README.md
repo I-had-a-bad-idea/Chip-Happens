@@ -25,12 +25,27 @@ npm run dev
 3. Create the database using the SQL Editor
 
 ```sql
+-- Drop existing tables (this will delete your data)
+drop table if exists players;
+drop table if exists games;
+
 create table games (
     id uuid primary key default gen_random_uuid(),
     code text unique not null,
-    pot integer not null default 0,
+    host uuid,
+
     buy_in integer not null default 1000,
-    round integer not null default 0,
+
+    small_blind integer not null default 10,
+    big_blind integer not null default 20,
+    
+    status text not null default 'waiting',
+    current_dealer uuid,
+    betting_round integer not null default 0,
+    pot integer not null default 0,
+    current_bet integer not null default 0,
+    current_player uuid,
+
     created_at timestamptz not null default now()
 );
 
@@ -38,7 +53,13 @@ create table players (
     id uuid primary key default gen_random_uuid(),
     game_id uuid not null references games(id) on delete cascade,
     name text not null,
+
+    active boolean not null default true,
     chips integer not null default 0,
+    current_bet integer not null default 0,
+    has_acted boolean not null default false,
+    folded boolean not null default false,
+
     created_at timestamptz not null default now()
 );
 
@@ -46,11 +67,14 @@ create index players_game_id_idx
     on players(game_id);
 ```
 
-4. Enable realtime for the `players` table
+4. Enable realtime for the tables
 
 ```sql
 alter publication supabase_realtime
 add table players;
+
+alter publication supabase_realtime
+add table games;
 ```
 
 5. Create a Vercel project

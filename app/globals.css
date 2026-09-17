@@ -14,6 +14,10 @@ body {
     sans-serif;
 }
 
+body {
+  min-width: 320px;
+}
+
 button,
 input {
   font: inherit;
@@ -21,14 +25,33 @@ input {
 
 button {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-/* Home */
+/* =========================
+   Global
+   ========================= */
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #8f98aa;
+  outline-offset: 2px;
+}
+
+/* =========================
+   Home
+   ========================= */
 
 .home {
   min-height: 100vh;
@@ -65,7 +88,8 @@ h1 {
 
 label {
   display: block;
-  margin-bottom: 8px;
+  margin-top: 8px;
+  margin-bottom: 4px;
   font-size: 14px;
   color: #b8bdc8;
 }
@@ -78,10 +102,15 @@ input {
   border: 1px solid #343944;
   border-radius: 8px;
   outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 input:focus {
   border-color: #777f91;
+  box-shadow: 0 0 0 3px rgba(119, 127, 145, 0.12);
 }
 
 .primary-button,
@@ -90,6 +119,9 @@ input:focus {
   border-radius: 8px;
   padding: 14px 18px;
   font-weight: 600;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 
 .primary-button {
@@ -99,9 +131,22 @@ input:focus {
   color: #111;
 }
 
+.primary-button:hover {
+  background: #e9e9e9;
+}
+
+.primary-button:active,
+.secondary-button:active {
+  transform: translateY(1px);
+}
+
 .secondary-button {
   background: #2a2e37;
   color: white;
+}
+
+.secondary-button:hover {
+  background: #343944;
 }
 
 .divider {
@@ -139,17 +184,20 @@ input:focus {
   padding: 12px;
   border-radius: 8px;
   background: #3a2024;
+  border: 1px solid #593037;
   color: #ffb5bb;
   font-size: 14px;
 }
 
-/* Game */
+/* =========================
+   Game layout
+   ========================= */
 
 .game-page {
   min-height: 100vh;
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px 24px 48px;
 }
 
 .game-header {
@@ -164,7 +212,13 @@ input:focus {
   font-size: 11px;
   font-weight: bold;
   letter-spacing: 1px;
-  margin-bottom: 3px;
+  margin-bottom: 5px;
+}
+
+.game-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .game-code {
@@ -174,29 +228,105 @@ input:focus {
   color: white;
   font-size: 28px;
   font-weight: bold;
+  letter-spacing: 0.5px;
+  transition: color 0.15s ease;
+}
+
+.game-code:hover {
+  color: #d5d9e1;
+}
+
+/* =========================
+   Invite button
+   ========================= */
+
+.invite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 8px 13px;
+
+  border: 1px solid #3b414d;
+  border-radius: 7px;
+
+  background: #242831;
+  color: #e9ebef;
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.invite-button::before {
+  content: "↗";
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.invite-button:hover {
+  background: #303641;
+  border-color: #4b5361;
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.invite-button:active {
+  transform: translateY(1px);
 }
 
 .copy-hint {
   color: #777e8c;
   font-size: 11px;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .leave-button {
   border: 0;
   background: none;
   color: #8e95a3;
+  padding: 8px 4px;
+  transition: color 0.15s ease;
 }
 
-.summary {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.leave-button:hover {
+  color: #d1d5dc;
+}
+
+/* =========================
+   Error
+   ========================= */
+
+.game-error {
   margin-bottom: 16px;
 }
 
+/* =========================
+   Game summary
+   ========================= */
+
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
 .summary > div {
-  padding: 18px;
+  min-width: 0;
+  padding: 16px 17px;
   background: #191c22;
   border: 1px solid #292d36;
   border-radius: 12px;
@@ -205,29 +335,175 @@ input:focus {
 .summary span {
   display: block;
   color: #7f8694;
-  font-size: 12px;
-  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .summary strong {
-  font-size: 24px;
+  display: block;
+  font-size: 23px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/* =========================
+   Waiting section
+   ========================= */
+
+.waiting-section {
+  position: relative;
+  margin-bottom: 18px;
+  padding: 22px;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.025),
+      rgba(255, 255, 255, 0)
+    ),
+    #171a20;
+  border: 1px solid #2b3039;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.waiting-section h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.waiting-section p {
+  margin-bottom: 10px;
+  color: #858c9a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.waiting-section > p {
+  margin-bottom: 18px;
+}
+
+.waiting-section > div {
+  padding-top: 4px;
+}
+
+.waiting-section > div p {
+  margin-bottom: 12px;
+  color: #666e7c;
+}
+
+.start-game-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 12px 20px;
+
+  background: #f2f3f5;
+  color: #111318;
+
+  font-weight: 700;
+  font-size: 14px;
+
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.start-game-button:hover:not(:disabled) {
+  background: white;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.start-game-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* =========================
+   Winner selection
+   ========================= */
+
+.winner-selection {
+  margin-bottom: 18px;
+}
+
+.winner-picker {
+  padding: 20px;
+  background: #191c22;
+  border: 1px solid #343944;
+  border-radius: 14px;
+}
+
+.winner-picker h2 {
+  margin-bottom: 14px;
+  font-size: 18px;
+}
+
+.winner-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-top: 8px;
+  padding: 13px 15px;
+
+  border: 1px solid #343944;
+  border-radius: 8px;
+
+  background: #22262e;
+  color: #e8eaf0;
+
+  text-align: left;
+  font-weight: 600;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.winner-button:hover {
+  background: #2c313b;
+  border-color: #4b5260;
+}
+
+.winner-button:active {
+  transform: translateY(1px);
+}
+
+/* =========================
+   Players
+   ========================= */
 
 .players {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .player {
+  position: relative;
   padding: 18px;
   background: #191c22;
   border: 1px solid #292d36;
   border-radius: 12px;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.player:hover {
+  border-color: #353b47;
 }
 
 .player-me {
-  border-color: #596171;
+  border-color: #4b5260;
+  background: #1b1e25;
 }
 
 .player-top {
@@ -237,61 +513,183 @@ input:focus {
 }
 
 .player-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+
   font-size: 17px;
   font-weight: 600;
 }
 
-.you-badge {
-  margin-left: 8px;
+.player-badge {
+  display: inline-flex;
+  align-items: center;
+
+  margin-left: 2px;
   padding: 3px 6px;
+
   border-radius: 4px;
   background: #303641;
   color: #aeb5c2;
+
   font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1;
   vertical-align: middle;
 }
 
 .chip-count {
-  margin-top: 5px;
+  margin-top: 6px;
   font-size: 30px;
   font-weight: bold;
+  letter-spacing: -0.5px;
 }
 
-.edit-button {
-  border: 1px solid #343944;
-  background: transparent;
-  color: #aeb4c0;
-  padding: 7px 11px;
-  border-radius: 6px;
-  font-size: 13px;
+.current-bet {
+  margin-top: 3px;
+  color: #777e8c;
+  font-size: 12px;
 }
 
-.chip-controls {
+/* =========================
+   Poker actions
+   ========================= */
+
+.poker-actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-top: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 17px;
+  padding-top: 16px;
+  border-top: 1px solid #292d36;
 }
 
-.chip-controls button {
-  border: 0;
-  border-radius: 6px;
-  padding: 11px 4px;
+.poker-actions button {
+  min-height: 42px;
+
+  border: 1px solid #343944;
+  border-radius: 7px;
+
   background: #292e37;
   color: #e4e6eb;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.chip-controls button:active {
-  background: #3a404c;
+.poker-actions button:hover:not(:disabled) {
+  background: #343a45;
+  border-color: #454c59;
 }
+
+.poker-actions button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Individual action buttons */
+
+.fold-button {
+  background: #30252a !important;
+  border-color: #49343b !important;
+  color: #e8b9c1 !important;
+}
+
+.fold-button:hover:not(:disabled) {
+  background: #3b2b31 !important;
+  border-color: #5a3b44 !important;
+}
+
+.check-button {
+  background: #242d2b !important;
+  border-color: #34433f !important;
+  color: #c5ddd5 !important;
+}
+
+.check-button:hover:not(:disabled) {
+  background: #2b3834 !important;
+  border-color: #43564f !important;
+}
+
+.call-button {
+  background: #292e37 !important;
+}
+
+.raise-button {
+  background: #313642 !important;
+  border-color: #414856 !important;
+}
+
+.raise-button:hover:not(:disabled) {
+  background: #3a404c !important;
+}
+
+/* Raise amount input */
+
+.poker-actions input[type="number"] {
+  min-width: 0;
+  height: 42px;
+  padding: 0 10px;
+
+  border: 1px solid #343944;
+  border-radius: 7px;
+
+  background: #101217;
+  color: #f5f5f5;
+
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.poker-actions input[type="number"]:focus {
+  border-color: #697285;
+  box-shadow: 0 0 0 3px rgba(105, 114, 133, 0.1);
+}
+
+/* Remove number input arrows */
+
+.poker-actions input[type="number"]::-webkit-inner-spin-button,
+.poker-actions input[type="number"]::-webkit-outer-spin-button {
+  opacity: 0.5;
+}
+
+/* =========================
+   Remove player
+   ========================= */
 
 .remove-button {
   margin-top: 12px;
+  padding: 4px 0;
+
   border: 0;
   background: transparent;
   color: #686f7c;
+
   font-size: 11px;
+
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
+
+.remove-button:hover {
+  color: #b2767e;
+}
+
+/* =========================
+   Empty / loading
+   ========================= */
 
 .empty,
 .loading {
@@ -300,25 +698,103 @@ input:focus {
   color: #777e8c;
 }
 
-.game-error {
-  margin-bottom: 16px;
+.loading {
+  min-height: 50vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-@media (max-width: 500px) {
-  .home {
-    align-items: flex-start;
-    padding-top: 60px;
-  }
+/* =========================
+   Mobile
+   ========================= */
 
-  .home-card {
-    padding: 28px 22px;
-  }
-
+@media (max-width: 600px) {
   .game-page {
-    padding: 18px;
+    padding: 22px 16px 40px;
   }
 
-  .chip-controls button {
-    font-size: 13px;
+  .game-header {
+    margin-bottom: 20px;
+  }
+
+  .game-code {
+    font-size: 25px;
+  }
+
+  .invite-button {
+    padding: 8px 11px;
+  }
+
+  .summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .summary > div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .summary strong {
+    font-size: 21px;
+  }
+
+  .player {
+    padding: 16px;
+  }
+
+  .chip-count {
+    font-size: 27px;
+  }
+
+  .poker-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .poker-actions input[type="number"] {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .game-header {
+    align-items: flex-start;
+  }
+
+  .game-code-row {
+    gap: 7px;
+  }
+
+  .game-code {
+    font-size: 22px;
+  }
+
+  .invite-button {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .leave-button {
+    font-size: 12px;
+  }
+
+  .summary > div {
+    padding: 13px;
+  }
+
+  .summary strong {
+    font-size: 18px;
+  }
+
+  .waiting-section,
+  .winner-picker {
+    padding: 17px;
+  }
+
+  .poker-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .poker-actions button {
+    font-size: 12px;
   }
 }
