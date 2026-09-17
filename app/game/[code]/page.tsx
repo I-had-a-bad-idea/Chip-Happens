@@ -182,25 +182,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
   }
 
-
-  async function changeChips(playerId: string, amount: number) {
-    // Check if player exists
-    const player = players.find((p) => p.id === playerId);
-    if (!player) return;
-    //  Dont allow chips to go below 0 (since that would mean debt)
-    const newAmount = Math.max(0, player.chips + amount);
-
-    // Update the chips in the DB
-    const { error } = await supabase
-      .from("players")
-      .update({ chips: newAmount })
-      .eq("id", playerId);
-
-    if (error) {
-      setError(error.message);
-    }
-  }
-
   async function removePlayer(playerId: string) {
     if (!window.confirm("Remove this player?")) return;
 
@@ -216,6 +197,9 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   function copyCode() {navigator.clipboard.writeText(code.toUpperCase());}
   const totalChips = players.reduce((total, player) => total + player.chips,0);
+
+  const currentPlayer = players.find((p) => p.id === currentPlayerId);
+  const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded;
 
   if (loading) {
     return (
@@ -291,7 +275,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                     {player.name}
 
                     {isMe && (
-                      <span className="you-badge">YOU</span>
+                      <span className="player-badge">YOU</span>
+                    )}
+                    {isMyTurn && (
+                      <span className="player-badge">YOUR TURN</span>
                     )}
                   </div>
 
