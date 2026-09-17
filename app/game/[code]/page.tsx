@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -45,6 +45,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
+  const actionInFlight = useRef(false);
 
   async function loadGame() {
     const gameCode = code.toUpperCase();
@@ -113,58 +114,48 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   async function progressToNextBettingRound() {
     if (!game) return;
 
-    console.log("Progressing to the next betting round. Current round:", game.betting_round);
-
     const nextBettingRound = game.betting_round + 1;
-    
-    if (nextBettingRound > BETTING_ROUND_NAMES.length - 1) {
-      // TODO: Aks who won the game round and reset the game for the next round
-          
-      // Update the game state in the DB
-      const { error } = await supabase
-        .from("games")
-        .update({ betting_round: nextBettingRound, current_bet: 0, current_player: null })
-        .eq("id", game.id);
-      if (error) {
-        setError(error.message);
-      }
-      // Update local copy of the game state
-      setGame((prevGame) => prevGame ? { ...prevGame, betting_round: nextBettingRound, current_bet: 0, current_player: null } : null);
-    }
-    
-    // Update the game state in the DB
+    const nextPlayer = nextBettingRound >= BETTING_ROUND_NAMES.length - 1 ? null : game.current_dealer;
+
     const { error } = await supabase
       .from("games")
-      .update({ betting_round: nextBettingRound, current_bet: 0 })
+      .update({
+        betting_round: nextBettingRound,
+        current_bet: 0,
+        current_player: nextPlayer,
+      })
       .eq("id", game.id);
-
-    // Update local copy of the game state
-    setGame((prevGame) => prevGame ? { ...prevGame, betting_round: nextBettingRound, current_bet: 0 } : null);
 
     if (error) {
       setError(error.message);
+      return;
     }
 
-    // Reset current bet for each player
-    for (const player of players) {
-      const { error: playerError } = await supabase
-        .from("players")
-        .update({ current_bet: 0 })
-        .eq("id", player.id);
-      
-      // Mark the player as not having acted
-      setPlayerHasActed(player.id, false);
+    const { error: playersError } = await supabase
+      .from("players")
+      .update({ current_bet: 0, has_acted: false })
+      .eq("game_id", game.id);
 
-      if (playerError) {
-        setError(playerError.message);
-      }
+    if (playersError) {
+      setError(playersError.message);
+      return;
     }
+
+    setGame((prevGame) => prevGame ? {
+      ...prevGame,
+      betting_round: nextBettingRound,
+      current_bet: 0,
+      current_player: nextPlayer,
+    } : null);
+    setPlayers((prevPlayers) => prevPlayers.map((player) => ({
+      ...player,
+      current_bet: 0,
+      has_acted: false,
+    })));
   }
 
   async function progressToNextPlayer(currentPlayerId: string, currentBet: number, updatedPlayers: Player[] = players) {
-    if (!game || !game.current_player) return;
-
-    console.log("Progressing to the next player. Current player:", game.current_player);
+    if (!game) return;
 
     const activePlayers = updatedPlayers.filter((p) => !p.folded);
     if (activePlayers.length <= 1) {
@@ -181,8 +172,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       const nextPlayer = activePlayers[(currentIndex + i) % activePlayers.length];
 
       if (nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) {
-        console.log("Next player to act:", nextPlayer.name);
-        console.log("Next player current bet:", nextPlayer.current_bet, "Current bet:", currentBet);
         const { error } = await supabase
           .from("games")
           .update({ current_player: nextPlayer.id })
@@ -199,119 +188,129 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     await progressToNextBettingRound();
   }
 
-  async function setPlayerHasActed(playerId: string, has_acted: boolean) {
-    // Update local copy of the players state
-    setPlayers((prevPlayers) => prevPlayers.map((p) => (p.id === playerId ? { ...p, has_acted } : p)));
-    const { error } = await supabase
-      .from("players")
-      .update({ has_acted })
-      .eq("id", playerId);
-
-    if (error) {
-      setError(error.message);
-    }
-  }
-
   async function call() {
-    if (!game || !currentPlayerId) return;
+    if (!game || !currentPlayerId || !isMyTurn || actionInFlight.current) return;
+    actionInFlight.current = true;
 
-    const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
-    const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
-    const chipsToCall = game.current_bet - currentBet;
-    if (chipsToCall <= 0) return; // No need to call if already matched
-    const newChipCount = currentChipCount - chipsToCall;
+    try {
+      const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
+      const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
+      const chipsToCall = game.current_bet - currentBet;
+      if (chipsToCall <= 0) return;
+      const newChipCount = currentChipCount - chipsToCall;
     
     // Update the player's chips in the DB
-    const { error: player_error } = await supabase
-      .from("players")
-      .update({ chips: newChipCount, current_bet: game.current_bet })
-      .eq("id", currentPlayerId);
+      const { error: player_error } = await supabase
+        .from("players")
+        .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true })
+        .eq("id", currentPlayerId);
 
     if (player_error) {
       setError(player_error.message);
     }
 
-    // Update the pot in the game
-    const newPot = game.pot + chipsToCall;
-    const { error: pot_error } = await supabase
-      .from("games")
-      .update({ pot: newPot })
-      .eq("id", game.id);
+      const newPot = game.pot + chipsToCall;
+      const { error: pot_error } = await supabase
+        .from("games")
+        .update({ pot: newPot })
+        .eq("id", game.id);
 
     if (pot_error) {
       setError(pot_error.message);
     }
 
-    // Update our local copy so progressToNextPlayer has the new bet.
-    const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, chips: newChipCount, current_bet: game.current_bet} : p);
-    // Mark the player as having acted
-    await setPlayerHasActed(currentPlayerId, true);
-    await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+      const updatedPlayers = players.map((p) => p.id === currentPlayerId
+        ? { ...p, chips: newChipCount, current_bet: game.current_bet, has_acted: true }
+        : p);
+      await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+    } finally {
+      actionInFlight.current = false;
+    }
   }
 
   async function fold() {
-    if (!game || !currentPlayerId) return;
-    
-    // Update the player's folded status in the DB
-    const { error: player_error } = await supabase
-      .from("players")
-      .update({ folded: true })
-      .eq("id", currentPlayerId);
+    if (!game || !currentPlayerId || !isMyTurn || actionInFlight.current) return;
+    actionInFlight.current = true;
 
-    if (player_error) {
-      setError(player_error.message);
+    try {
+      const { error } = await supabase
+        .from("players")
+        .update({ folded: true, has_acted: true })
+        .eq("id", currentPlayerId);
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      const updatedPlayers = players.map((player) => player.id === currentPlayerId
+        ? { ...player, folded: true, has_acted: true }
+        : player);
+      await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+    } finally {
+      actionInFlight.current = false;
     }
-
-    // Update our local copy so progressToNextPlayer has the new bet.
-    const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, folded: true} : p);
-    // Mark the player as having acted
-    await setPlayerHasActed(currentPlayerId, true);
-    await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
   }
 
   async function check() {
-    if (!game || !currentPlayerId) return;
+    if (!game || !currentPlayerId || !isMyTurn || actionInFlight.current) return;
+    actionInFlight.current = true;
 
-    // No DB update needed for checking, just move to the next player
-    
-    // Mark the player as having acted
-    await setPlayerHasActed(currentPlayerId, true);
-    await progressToNextPlayer(currentPlayerId, game.current_bet, players);
+    try {
+      const { error } = await supabase
+        .from("players")
+        .update({ has_acted: true })
+        .eq("id", currentPlayerId);
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      const updatedPlayers = players.map((player) => player.id === currentPlayerId
+        ? { ...player, has_acted: true }
+        : player);
+      await progressToNextPlayer(currentPlayerId, game.current_bet, updatedPlayers);
+    } finally {
+      actionInFlight.current = false;
+    }
   }
 
   async function raise(raise_amount: number) {
-    if (!game || !currentPlayerId) return;
+    if (!game || !currentPlayerId || !isMyTurn || actionInFlight.current) return;
+    actionInFlight.current = true;
 
-    const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
-    const newChipCount = currentChipCount - raise_amount;
-    const newCurrentBet = game.current_bet + raise_amount;
+    try {
+      const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
+      const newChipCount = currentChipCount - raise_amount;
+      const newCurrentBet = game.current_bet + raise_amount;
 
-    // Update the player's chips in the DB
-    const { error: player_error } = await supabase
-      .from("players")
-      .update({ chips: newChipCount, current_bet: newCurrentBet })
-      .eq("id", currentPlayerId);
+      const { error: player_error } = await supabase
+        .from("players")
+        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true })
+        .eq("id", currentPlayerId);
 
-    if (player_error) {
-      setError(player_error.message);
+      if (player_error) {
+        setError(player_error.message);
+      }
+
+      const newPot = game.pot + raise_amount;
+      const { error: pot_error } = await supabase
+        .from("games")
+        .update({ pot: newPot, current_bet: newCurrentBet })
+        .eq("id", game.id);
+
+      if (pot_error) {
+        setError(pot_error.message);
+      }
+
+      const updatedPlayers = players.map((player) => player.id === currentPlayerId
+        ? { ...player, chips: newChipCount, current_bet: newCurrentBet, has_acted: true }
+        : player);
+      await progressToNextPlayer(currentPlayerId, newCurrentBet, updatedPlayers);
+    } finally {
+      actionInFlight.current = false;
     }
-
-    // Update the pot and current bet in the game
-    const newPot = game.pot + raise_amount ;
-    const { error: pot_error } = await supabase
-      .from("games")
-      .update({ pot: newPot, current_bet: game.current_bet + raise_amount })
-      .eq("id", game.id);
-
-    if (pot_error) {
-      setError(pot_error.message);
-    }
-
-    // Update our local copy so progressToNextPlayer has the new bet.
-    const updatedPlayers = players.map((p) => p.id === currentPlayerId ? { ...p, chips: newChipCount, current_bet: newCurrentBet} : p);
-    // Mark the player as having acted
-    await setPlayerHasActed(currentPlayerId, true);
-    await progressToNextPlayer(currentPlayerId, newCurrentBet, updatedPlayers);
   }
 
   async function resetGame() {
