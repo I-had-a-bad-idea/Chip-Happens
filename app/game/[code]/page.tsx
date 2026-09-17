@@ -203,7 +203,24 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     const playersInHand = activePlayers.filter((p) => !p.folded);
 
     const nextBettingRound = game.betting_round + 1;
-    const nextPlayer = nextBettingRound >= BETTING_ROUND_NAMES.length - 1 ? null : game.current_dealer;
+    let nextPlayer: string | null = null;
+
+    if (nextBettingRound < BETTING_ROUND_NAMES.length - 1) {
+      // Find the dealers position in the current hand
+      const dealerIndex = playersInHand.findIndex((p) => p.id === game.current_dealer);
+
+      // Post-Flop the small blind is the first player to act
+      // Starting with the small blind, search for an eligible player
+      for (let i = 1; i <= playersInHand.length; i++) {
+        const player = playersInHand[(dealerIndex + i) % playersInHand.length];
+
+        // The first eligible player acts first
+        if (player.active && !player.folded) {
+          nextPlayer = player.id;
+          break;
+        }
+      }
+    }
 
     const { error } = await supabase
       .from("games")
