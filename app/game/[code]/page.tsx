@@ -24,13 +24,14 @@ type Game = {
   buy_in: number;
 
   current_dealer: string | null;
-  round: number; // Preflop, Flop, Turn, River
+  betting_round: number; // Preflop, Flop, Turn, River
   current_bet: number;
   current_player: string | null;
 
   created_at: string
 };
 
+const BETTING_ROUND_NAMES = ["Preflop", "Flop", "Turn", "River", "Showdown"];
 
 export default function GamePage({params,}: {params: Promise<{ code: string }>;}) {
   const { code } = use(params);
@@ -107,6 +108,29 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
+  async function progressToNextBettingRound() {
+    if (!game) return;
+
+    const nextBettingRound = game.betting_round + 1;
+    
+    if (nextBettingRound > BETTING_ROUND_NAMES.length - 1) {
+      // TODO: Aks who won the game round and reset the game for the next round
+      
+    }
+    
+    
+    const { error } = await supabase
+      .from("games")
+      .update({ betting_round: nextBettingRound, current_player: null })
+      .eq("id", game.id);
+
+    if (error) {
+      setError(error.message);
+    }
+
+    
+  }
+
   async function progressToNextPlayer() {
     if (!game || !game.current_player) return;
 
@@ -119,16 +143,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     if (currentIndex + 1 >= activePlayers.length) {
       // If the current player is the last in the list, proceed to the next round (Flop, Turn, River, Showdown)
-      const nextRound = game.round + 1;
-      const { error } = await supabase
-        .from("games")
-        .update({ round: nextRound, current_player: null })
-        .eq("id", game.id);
-
-      if (error) {
-        setError(error.message);
-      }
-
+      progressToNextBettingRound();
       return;
     }
 
@@ -302,6 +317,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         <div>
           <span>Pot</span>
           <strong>{pot.toLocaleString()}</strong>
+        </div>
+
+        <div>
+          <span>Betting Round</span>
+          <strong>{BETTING_ROUND_NAMES[game.betting_round]}</strong>
         </div>
 
         <div>

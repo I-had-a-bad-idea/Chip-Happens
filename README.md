@@ -33,7 +33,6 @@ create table games (
     id uuid primary key default gen_random_uuid(),
     code text unique not null,
 
-    pot integer not null default 0,
     buy_in integer not null default 1000,
     
     current_dealer uuid,
