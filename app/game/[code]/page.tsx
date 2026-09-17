@@ -313,6 +313,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       <section className="players">
         {players.map((player) => {
           const isMe = player.id === currentPlayerId;
+          const isCurrentPlayer = player.id === game.current_player;
 
           return (
             <article
@@ -327,8 +328,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                     {isMe && (
                       <span className="player-badge">YOU</span>
                     )}
-                    {isMyTurn && (
+                    {(isMe && isMyTurn) && (
                       <span className="player-badge">YOUR TURN</span>
+                    )}
+                    {(!isMe && isCurrentPlayer) && (
+                      <span className="player-badge">Thinking about going all-in...</span>
                     )}
                   </div>
 
