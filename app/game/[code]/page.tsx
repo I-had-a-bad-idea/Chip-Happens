@@ -116,10 +116,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
-  async function startNewHand(first_hand: boolean) {
-    if (!game || players.length < 2) return;
+  async function startNewHand(first_hand: boolean, playersForHand: Player[] = players) {
+    if (!game || playersForHand.length < 2) return;
 
-    const activePlayers = players.filter((p) => p.active);
+    const activePlayers = playersForHand.filter((p) => p.active);
     const playersInHand = activePlayers.filter((p) => !p.folded);
     
     if (playersInHand.length < 2) return;
@@ -285,7 +285,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       if (chipsToCall <= 0) return;
       const newChipCount = currentChipCount - chipsToCall;
     
-    // Update the player's chips in the DB
+      // Update the player's chips in the DB
       const { error: player_error } = await supabase
         .from("players")
         .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true })
@@ -293,6 +293,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     if (player_error) {
       setError(player_error.message);
+      return;
     }
 
       const newPot = game.pot + chipsToCall;
@@ -303,6 +304,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     if (pot_error) {
       setError(pot_error.message);
+      return;
     }
 
       const updatedPlayers = players.map((p) => p.id === currentPlayerId
@@ -378,6 +380,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       if (player_error) {
         setError(player_error.message);
+        return;
       }
 
       const newPot = game.pot + raise_amount;
@@ -425,6 +428,21 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       }
     }
 
+    // Fetch the actual DB values after awarding the pot.
+    const { data: freshPlayers, error: freshPlayersError } = await supabase
+      .from("players")
+      .select("*")
+      .eq("game_id", game.id)
+      .order("created_at", { ascending: true });
+
+    if (freshPlayersError || !freshPlayers) {
+      setError(freshPlayersError?.message ?? "Could not reload players.");
+      return;
+    }
+
+    // Keep local state synchronized.
+    setPlayers(freshPlayers);
+
     // Update local copy of the game state
     setGame((prevGame) => prevGame ? { ...prevGame, pot: 0, betting_round: 0, current_bet: 0, current_player: prevGame.current_dealer } : null);
     
@@ -432,7 +450,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
 
     if (game.status == "playing") { 
-      await startNewHand(false);
+      await startNewHand(false, freshPlayers);
     } 
   }
 
@@ -445,20 +463,36 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Get the winner
-    const winner = players.find((p) => p.id === winnerId);
-    if (!winner) {
-      setError("Winner not found.");
+    // Do not trust Reacts data, instead fetch the latests values from the DB
+    const {data: freshGame, error: freshGameError} = await supabase
+      .from("games")
+      .select("*")
+      .eq("id", game.id)
+      .single();
+
+    if (freshGameError || !freshGame) {
+      setError(freshGameError?.message ?? "Could not get current game.");
       return;
     }
 
-    if (winner.folded || !winner.active) {
+    const {data: freshWinner, error: freshWinnerError} = await supabase
+      .from("players")
+      .select("*")
+      .eq("id", winnerId)
+      .single();
+
+    if (freshWinnerError || !freshWinner) {
+      setError(freshWinnerError?.message ?? "Winner not found.");
+      return;
+    }
+
+    if (freshWinner.folded || !freshWinner.active) {
       setError("Cannot choose a folded or inactive player as the winner.");
       return;
     }
 
     // Update the winner's chips in the DB
-    const newChipCount = winner.chips + game.pot;
+    const newChipCount = freshWinner.chips + game.pot;
     const { error: player_error } = await supabase
       .from("players")
       .update({ chips: newChipCount })
