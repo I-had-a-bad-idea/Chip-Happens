@@ -138,7 +138,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     // Big blind is after small blind
     const bigBlindPlayer = playersInHand[(newDealerIndex + 2) % playersInHand.length];
     // First player to act is after the big blind
-    const underTheGunPlayer = activePlayers[(newDealerIndex + 3) % activePlayers.length];
+    const underTheGunPlayer = playersInHand[(newDealerIndex + 3) % playersInHand.length];
 
     // Don't allow the blinds to go into debt
     const smallBlindAmount = Math.min(game.small_blind, smallBlindPlayer.chips);
@@ -198,6 +198,9 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   async function progressToNextBettingRound() {
     if (!game) return;
+
+    const activePlayers = players.filter((p) => p.active);
+    const playersInHand = activePlayers.filter((p) => !p.folded);
 
     const nextBettingRound = game.betting_round + 1;
     const nextPlayer = nextBettingRound >= BETTING_ROUND_NAMES.length - 1 ? null : game.current_dealer;
@@ -492,7 +495,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     // Update the winner's chips in the DB
-    const newChipCount = freshWinner.chips + game.pot;
+    const newChipCount = freshWinner.chips + freshGame.pot;
     const { error: player_error } = await supabase
       .from("players")
       .update({ chips: newChipCount })
@@ -712,7 +715,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 onClick={() => raise(chipAmount)}
                 disabled={player.chips < chipAmount}
               >
-                Raise {chipAmount}
+                Raise by {chipAmount}
               </button>
             </div>
           )}
