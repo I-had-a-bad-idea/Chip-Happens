@@ -436,7 +436,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     try {
       const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
-      const newChipCount = currentChipCount - raise_amount;
+      const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
+      const chipsToMatch = game.current_bet - currentBet;
+
+      const newChipCount = currentChipCount - chipsToMatch - raise_amount;
       const newCurrentBet = game.current_bet + raise_amount;
 
       const { error: player_error } = await supabase
@@ -449,7 +452,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         return;
       }
 
-      const newPot = game.pot + raise_amount;
+      const newPot = game.pot + chipsToMatch + raise_amount;
       const { error: pot_error } = await supabase
         .from("games")
         .update({ pot: newPot, current_bet: newCurrentBet })
@@ -728,6 +731,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         {players.map((player) => {
           const isMe = player.id === currentPlayerId;
           const isCurrentPlayer = player.id === game.current_player;
+          const chipsToMatch = game.current_bet - player.current_bet;
 
           return (
             <article
@@ -798,7 +802,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
               <button
                 className="raise-button"
                 onClick={() => raise(chipAmount)}
-                disabled={player.chips < chipAmount}
+                disabled={player.chips < (chipsToMatch + chipAmount)}
               >
                 Raise by {chipAmount}
               </button>
