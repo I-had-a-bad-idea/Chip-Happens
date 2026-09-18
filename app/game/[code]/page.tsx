@@ -207,7 +207,13 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     if (nextBettingRound < BETTING_ROUND_NAMES.length - 1) {
       // Find the dealers position in the current hand
-      const dealerIndex = playersInHand.findIndex((p) => p.id === game.current_dealer);
+      // Use active players, since the current player might have folded
+      const dealerIndex = activePlayers.findIndex((p) => p.id === game.current_dealer);
+    
+      if (dealerIndex === -1) {
+        setError("Could not determine dealer position.");
+        return;
+      }
 
       // Post-Flop the small blind is the first player to act
       // Starting with the small blind, search for an eligible player
@@ -280,10 +286,13 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
       return;
     }
-    const currentIndex = playersInHand.findIndex((p) => p.id === currentPlayerId);
+    // Use active players, since the current player might have folded
+    const currentIndex = activePlayers.findIndex((p) => p.id === currentPlayerId);
 
-    if (currentIndex === -1 ) return;
-
+    if (currentIndex === -1 ) {
+      setError("Could not find the current player")
+      return;
+    }
 
     // Look for the next active player who has not matched the current bet or still needs to act
     for (let i = 1; i <= playersInHand.length; i++) {
