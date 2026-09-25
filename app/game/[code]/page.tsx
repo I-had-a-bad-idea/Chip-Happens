@@ -809,7 +809,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                   .map((player) => (
                     <button
                       key={player.id}
-                      className={`winner-button ${potWinnerSelections[index] === player.id ? "selected" : ""}`}
+                      className={`winner-button ${potWinnerSelections[index] === player.id ? "winner-selected" : ""}`}
                       onClick={() => selectPotWinner(index, player.id)}
                     >
                       {player.name} ({player.chips.toLocaleString()} chips)
