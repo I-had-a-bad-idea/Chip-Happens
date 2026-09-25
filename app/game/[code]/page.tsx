@@ -305,7 +305,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     for (let i = 1; i <= playersInHand.length; i++) {
       const nextPlayer = playersInHand[(currentIndex + i) % playersInHand.length];
 
-      if (nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) {
+      // if player is all-in he is just skipped
+      if ((nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) && !nextPlayer.all_in) {
         const { error } = await supabase
           .from("games")
           .update({ current_player: nextPlayer.id })
@@ -329,14 +330,24 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     try {
       const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
       const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
-      const chipsToCall = game.current_bet - currentBet;
+      let chipsToCall = game.current_bet - currentBet;
       if (chipsToCall <= 0) return;
+      
+      let allIn = false
+      if (chipsToCall >= currentChipCount) {
+        chipsToCall = currentChipCount; // dont allow calling to go beyond what the player has  
+        allIn = true;
+      }
       const newChipCount = currentChipCount - chipsToCall;
+
     
       // Update the player's chips in the DB
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true, total_contribution: currentPlayer.total_contribution + chipsToCall})
+        .update({ chips: newChipCount, current_bet: game.current_bet,
+          has_acted: true,
+          all_in: allIn,
+          total_contribution: currentPlayer.total_contribution + chipsToCall})
         .eq("id", currentPlayerId);
 
     if (player_error) {
@@ -450,9 +461,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       const newCurrentBet = game.current_bet + raise_amount;
       const newTotalContribution = currentBet + chipsToMatch + raise_amount;
 
+      const allIn = newChipCount === 0;
+
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true, total_contribution: newTotalContribution })
+        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true, total_contribution: newTotalContribution, all_in: allIn })
         .eq("id", currentPlayerId);
 
       if (player_error) {
@@ -821,9 +834,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 <button
                   className="call-button"
                   onClick={call}
-                  disabled={player.chips < game.current_bet}
+                  // Dont disable to allow all-ins (which the call function can handle)
+                  // disabled={player.chips < (game.current_bet - player.current_bet)}
                 >
-                  Call {game.current_bet - player.current_bet}
+                  {player.chips > (game.current_bet - player.current_bet)
+                      ? `Call ${game.current_bet - player.current_bet}`
+                      : `All in ${player.chips}`}
                 </button>
               )}
 
