@@ -279,25 +279,28 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     })));
   }
 
+  async function skipToShowdown() {
+    if (!game) return;
+    const {error} = await supabase
+      .from("games")
+      .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
+      .eq("id", game.id);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
+  }
+
   async function progressToNextPlayer(currentPlayerId: string, currentBet: number, updatedPlayers: Player[] = players) {
     if (!game) return;
 
     const activePlayers = updatedPlayers.filter((p) => p.active);
     const playersInHand = activePlayers.filter((p) => !p.folded);
     if (playersInHand.length === 1) {
-      // const winner = playersInHand[0]; // last remaining player wins
-
       // Switch to showdown so host can select the last player as the winner
-      const {error} = await supabase
-        .from("games")
-        .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
-        .eq("id", game.id);
-
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
+      await skipToShowdown();
       return;
     }
     // Use active players, since the current player might have folded
@@ -308,12 +311,21 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Look for the next active player who has not matched the current bet or still needs to act
-    for (let i = 1; i <= playersInHand.length; i++) {
-      const nextPlayer = playersInHand[(currentIndex + i) % playersInHand.length];
+    const playersWhoCanAct = playersInHand.filter((p) => (!p.all_in && p.active && !p.folded));
+    if (playersWhoCanAct.length === 0) {
+      await skipToShowdown();
+      return;
+    }
 
-      // if player is all-in he is just skipped
-      if ((nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) && !nextPlayer.all_in) {
+    // Look for the next player who can act (and has not matched the current bet or still needs to act)
+    for (let i = 1; i <= activePlayers.length; i++) {
+      const nextPlayer = activePlayers[(currentIndex + i) % activePlayers.length];
+
+      // if player is all-in, folded or inactive he is just skipped
+      if (nextPlayer.all_in || !nextPlayer.active || nextPlayer.folded) {
+        continue;
+      }
+      if (nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) {
         const { error } = await supabase
           .from("games")
           .update({ current_player: nextPlayer.id })
@@ -351,7 +363,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       // Update the player's chips in the DB
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: game.current_bet,
+        .update({ chips: newChipCount, current_bet: currentBet + chipsToCall,
           has_acted: true,
           all_in: allIn,
           total_contribution: currentPlayer.total_contribution + chipsToCall})
@@ -553,7 +565,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   function buildPots(players: Player[]): Pot[] {
     const contributions = players
-      .filter((p) => p.active)
       .map((p) => ({id: p.id, contributed: p.total_contribution, folded: p.folded}))
       .filter((p) => p.contributed > 0);
 
