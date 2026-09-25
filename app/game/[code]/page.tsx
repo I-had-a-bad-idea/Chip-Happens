@@ -12,8 +12,10 @@ type Player = {
   active: boolean;
   chips: number;
   current_bet: number;
+  total_contribution: number;
   has_acted: boolean;
   folded: boolean;
+  all_in: boolean;
 
   created_at: string;
 };
@@ -144,10 +146,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     const smallBlindAmount = Math.min(game.small_blind, smallBlindPlayer.chips);
     const bigBlindAmount = Math.min(game.big_blind, bigBlindPlayer.chips);
 
-      // Update players
+    // Update players
     const { error: smallBlindError } = await supabase
       .from("players")
-      .update({chips: smallBlindPlayer.chips - smallBlindAmount, current_bet: smallBlindAmount,})
+      .update({chips: smallBlindPlayer.chips - smallBlindAmount, current_bet: smallBlindAmount, total_contribution: smallBlindPlayer.total_contribution + smallBlindAmount})
       .eq("id", smallBlindPlayer.id);
 
     if (smallBlindError) {
@@ -157,7 +159,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     const { error: bigBlindError } = await supabase
       .from("players")
-      .update({chips: bigBlindPlayer.chips - bigBlindAmount, current_bet: bigBlindAmount,})
+      .update({chips: bigBlindPlayer.chips - bigBlindAmount, current_bet: bigBlindAmount, total_contribution: bigBlindPlayer.total_contribution + bigBlindAmount})
       .eq("id", bigBlindPlayer.id);
 
     if (bigBlindError) {
@@ -329,7 +331,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       // Update the player's chips in the DB
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true })
+        .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true, total_contribution: currentPlayer.total_contribution + chipsToCall})
         .eq("id", currentPlayerId);
 
     if (player_error) {
@@ -441,10 +443,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       const newChipCount = currentChipCount - chipsToMatch - raise_amount;
       const newCurrentBet = game.current_bet + raise_amount;
+      const newTotalContribution = currentBet + chipsToMatch + raise_amount;
 
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true })
+        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true, total_contribution: newTotalContribution })
         .eq("id", currentPlayerId);
 
       if (player_error) {
@@ -484,11 +487,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Reset each player's current bet, folded status, and has_acted status
+    // Reset each player's current bet, folded status, total_contribution and has_acted status
     for (const player of players) {
       const { error: playerError } = await supabase
         .from("players")
-        .update({ current_bet: 0, folded: false, has_acted: false })
+        .update({ current_bet: 0, folded: false, has_acted: false, total_contribution: 0})
         .eq("id", player.id);
 
       if (playerError) {

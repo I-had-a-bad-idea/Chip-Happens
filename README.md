@@ -57,8 +57,10 @@ create table players (
     active boolean not null default true,
     chips integer not null default 0,
     current_bet integer not null default 0,
+    total_contribution integer not null default 0,
     has_acted boolean not null default false,
     folded boolean not null default false,
+    all_in boolean not null default false,
 
     created_at timestamptz not null default now()
 );
