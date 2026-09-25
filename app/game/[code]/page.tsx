@@ -573,11 +573,22 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       const eligiblePlayers = contributors.filter((p) => !p.folded).map((p) => p.id);
       
       if (amount > 0) {
-        pots.push({amount, eligiblePlayerIds: eligiblePlayers});
+        const lastPot = pots[pots.length - 1];
+
+        // Check if the last pot had the same eligible players
+        const sameEligiblePlayers = lastPot && lastPot.eligiblePlayerIds.length === eligiblePlayers.length &&
+          lastPot.eligiblePlayerIds.every((id) => eligiblePlayers.includes(id));
+        
+        if (sameEligiblePlayers) {
+          lastPot.amount += amount; // if yes, just expand the last pot
+        } else {
+          pots.push({amount, eligiblePlayerIds: eligiblePlayers});
+        }
       }
 
       previousLevel = level;
     }
+
     return pots;
   }
 
