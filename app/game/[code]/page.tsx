@@ -381,6 +381,31 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
   }
 
+  async function togglePlayerActive(playerId: string) {
+    if (!isHost) return;
+
+    const player = players.find((p) => p.id === playerId);
+    if (!player) return;
+
+    // Dont allow changing participation during an active hand.
+    if (game?.status === "playing" && !isShowdown) {
+      setError("Players can only be made inactive between hands.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("players")
+      .update({active: !player.active,})
+      .eq("id", playerId);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    // update local players
+    setPlayers((prevPlayers) => prevPlayers.map((p) => p.id === playerId ? { ...p, active: !p.active } : p));
+  }
+
   async function check() {
     if (!game || !currentPlayerId || !isMyTurn || actionInFlight.current) return;
     actionInFlight.current = true;
@@ -780,12 +805,22 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
             </div>
           )}
           {isHost && (
-            <button
-              className="remove-button"
-              onClick={() => removePlayer(player.id)}
-            >
-            Remove player
-            </button>
+            <div className="host-player-actions">
+              <button
+                className="remove-button"
+                onClick={() => removePlayer(player.id)}
+              >
+              Remove player
+              </button>
+              
+              <button
+                className="active-button"
+                onClick={() => togglePlayerActive(player.id)}
+                disabled={game.status === "playing" && !isShowdown}
+              >
+              {player.active ? "Make inactive": "Make active"}
+              </button>
+            </div>
           )}
             </article>
           );
