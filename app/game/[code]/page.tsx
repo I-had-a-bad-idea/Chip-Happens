@@ -40,6 +40,11 @@ type Game = {
   created_at: string
 };
 
+type Pot = {
+  amount: number;
+  eligiblePlayerIds: string[];
+};
+
 const BETTING_ROUND_NAMES = ["Preflop", "Flop", "Turn", "River", "Showdown"];
 
 export default function GamePage({params,}: {params: Promise<{ code: string }>;}) {
@@ -524,6 +529,36 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (game.status == "playing") { 
       await startNewHand(false, freshPlayers);
     } 
+  }
+
+  function buildPots(players: Player[]): Pot[] {
+    const contributions = players
+      .filter((p) => p.active)
+      .map((p) => ({id: p.id, contributed: p.total_contribution, folded: p.folded}))
+      .filter((p) => p.contributed > 0);
+
+    if (contributions.length === 0) {
+      return [];
+    }
+
+    const levels : number[] = [...new Set(contributions.map((p) => p.contributed))].sort((a, b) => a - b);
+    const pots: Pot[] = [];
+    let previousLevel = 0;
+    
+    for (const level of levels) {
+      const amountAtLevel = level - previousLevel;
+
+      const contributors = contributions.filter((p) => p.contributed >= level);
+      const amount = amountAtLevel * contributors.length;
+      const eligiblePlayers = contributors.filter((p) => !p.folded).map((p) => p.id);
+      
+      if (amount > 0) {
+        pots.push({amount, eligiblePlayerIds: eligiblePlayers});
+      }
+
+      previousLevel = level;
+    }
+    return pots;
   }
 
   async function chooseWinner(winnerId: string) {
