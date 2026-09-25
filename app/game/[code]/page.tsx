@@ -57,6 +57,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
+  const [potWinnerSelections, setPotWinnerSelections] = useState<Record<number, string>>({});
   const actionInFlight = useRef(false);
 
   async function loadGame() {
@@ -122,6 +123,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     return () => {supabase.removeChannel(channel);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
+
+  useEffect(() => {
+    if (game?.status === "playing" && game?.betting_round === BETTING_ROUND_NAMES.length - 1) {
+      setPotWinnerSelections({});
+    }
+  }, [game?.status, game?.betting_round]);
 
   async function startNewHand(first_hand: boolean, playersForHand: Player[] = players) {
     if (!game || playersForHand.length < 2) return;
@@ -574,56 +581,73 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     return pots;
   }
 
-  async function chooseWinner(winnerId: string) {
+  async function awardPots() {
     if (!game) return;
 
-    // Only host can choose the winner
+    // Only host can choose the winners
     if (currentPlayerId !== game.host) {
-      setError("Only the host can choose the winner.");
+      setError("Only the host can award the pots.");
       return;
     }
 
-    // Do not trust Reacts data, instead fetch the latests values from the DB
-    const {data: freshGame, error: freshGameError} = await supabase
-      .from("games")
-      .select("*")
-      .eq("id", game.id)
-      .single();
-
-    if (freshGameError || !freshGame) {
-      setError(freshGameError?.message ?? "Could not get current game.");
-      return;
-    }
-
-    const {data: freshWinner, error: freshWinnerError} = await supabase
+     // Do not trust Reacts data, instead fetch the latests values from the DB
+    const { data: freshPlayers, error: freshPlayersError } = await supabase
       .from("players")
       .select("*")
-      .eq("id", winnerId)
-      .single();
+      .eq("game_id", game.id)
+      .order("created_at", { ascending: true });
 
-    if (freshWinnerError || !freshWinner) {
-      setError(freshWinnerError?.message ?? "Winner not found.");
+    if (freshPlayersError || !freshPlayers) {
+      setError(freshPlayersError?.message ?? "Could not load players for the pot payout.");
       return;
     }
 
-    if (freshWinner.folded || !freshWinner.active) {
-      setError("Cannot choose a folded or inactive player as the winner.");
+    const pots = buildPots(freshPlayers);
+
+    if (pots.length === 0) {
+      await resetGame();
       return;
     }
 
-    // Update the winner's chips in the DB
-    const newChipCount = freshWinner.chips + freshGame.pot;
-    const { error: player_error } = await supabase
-      .from("players")
-      .update({ chips: newChipCount })
-      .eq("id", winnerId);
+    for (let potIndex = 0; potIndex < pots.length; potIndex++) {
+      const pot = pots[potIndex];
+      const winnerId = potWinnerSelections[potIndex];
 
-    if (player_error) {
-      setError(player_error.message);
-      return;
+      if (!winnerId || !pot.eligiblePlayerIds.includes(winnerId)) {
+        setError(`Select a winner for pot ${potIndex + 1}.`);
+        return;
+      }
+
+      const winner = freshPlayers.find((player) => player.id === winnerId);
+
+      if (!winner || winner.folded || !winner.active) {
+        setError("Cannot award a pot to a folded or inactive player.");
+        return;
+      }
+      
+      // Update the winner's chips in the DB
+      const winnerIndex = freshPlayers.findIndex((player) => player.id === winnerId);
+      const updatedChipCount = freshPlayers[winnerIndex].chips + pot.amount;
+
+      const { error: playerError } = await supabase
+        .from("players")
+        .update({ chips: updatedChipCount })
+        .eq("id", winnerId);
+
+      if (playerError) {
+        setError(playerError.message);
+        return;
+      }
+
+      freshPlayers[winnerIndex] = { ...freshPlayers[winnerIndex], chips: updatedChipCount };
     }
     // Reset the game for the next round
     await resetGame();
+  }
+
+  function selectPotWinner(potIndex: number, winnerId: string) {
+    setPotWinnerSelections((prev) => ({ ...prev, [potIndex]: winnerId }));
+    setError("");
   }
     
 
@@ -658,6 +682,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   }
 
   const pot = game?.pot ?? 0;
+  const showdownPots = buildPots(players);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded && currentPlayer?.active;
@@ -762,18 +787,28 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       )}
 
       <div className="winner-selection">
-        {game.status === "playing"  && isShowdown && isHost && (
+        {game.status === "playing" && isShowdown && isHost && showdownPots.length > 0 && (
           <div className="winner-picker">
-            <h2>Choose the winner</h2>
-            {playersInHand.map((player) => (
-              <button
-                key={player.id}
-                className="winner-button"
-                onClick={() => chooseWinner(player.id)}
-              >
-                {player.name} ({player.chips.toLocaleString()} chips)
-              </button>
+            <h2>Award the pots</h2>
+            {showdownPots.map((potItem, index) => (
+              <div key={`${potItem.amount}-${index}`} className="pot-award">
+                <h3>Pot {index + 1}: {potItem.amount.toLocaleString()} chips</h3>
+                {playersInHand
+                  .filter((player) => potItem.eligiblePlayerIds.includes(player.id))
+                  .map((player) => (
+                    <button
+                      key={player.id}
+                      className={`winner-button ${potWinnerSelections[index] === player.id ? "selected" : ""}`}
+                      onClick={() => selectPotWinner(index, player.id)}
+                    >
+                      {player.name} ({player.chips.toLocaleString()} chips)
+                    </button>
+                  ))}
+              </div>
             ))}
+            <button className="start-game-button" onClick={awardPots}>
+              Award pots
+            </button>
           </div>
         )}
       </div>
