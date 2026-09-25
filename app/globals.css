@@ -540,6 +540,41 @@ input:focus {
   vertical-align: middle;
 }
 
+.player-inactive {
+  opacity: 0.5;
+}
+
+.player-inactive .player-name::after {
+  content: " INACTIVE";
+  margin-left: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.host-player-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.active-button {
+  margin-top: 12px;
+  padding: 4px 0;
+
+  border: 0;
+  background: transparent;
+  color: #686f7c;
+
+  font-size: 11px;
+
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+.active-button:hover {
+  color: #7c76b2;
+}
+
 .chip-count {
   margin-top: 6px;
   font-size: 30px;
