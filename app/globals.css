@@ -475,6 +475,11 @@ input:focus {
   transform: translateY(1px);
 }
 
+.winner-selected {
+  background: #2c313b;
+  border-color: #f0f0f0;
+}
+
 /* =========================
    Players
    ========================= */

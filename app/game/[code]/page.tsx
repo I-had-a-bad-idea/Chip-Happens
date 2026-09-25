@@ -12,8 +12,10 @@ type Player = {
   active: boolean;
   chips: number;
   current_bet: number;
+  total_contribution: number;
   has_acted: boolean;
   folded: boolean;
+  all_in: boolean;
 
   created_at: string;
 };
@@ -38,6 +40,11 @@ type Game = {
   created_at: string
 };
 
+type Pot = {
+  amount: number;
+  eligiblePlayerIds: string[];
+};
+
 const BETTING_ROUND_NAMES = ["Preflop", "Flop", "Turn", "River", "Showdown"];
 
 export default function GamePage({params,}: {params: Promise<{ code: string }>;}) {
@@ -50,6 +57,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
+  const [potWinnerSelections, setPotWinnerSelections] = useState<Record<number, string>>({});
   const actionInFlight = useRef(false);
 
   async function loadGame() {
@@ -116,6 +124,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
+  useEffect(() => {
+    if (game?.status === "playing" && game?.betting_round === BETTING_ROUND_NAMES.length - 1) {
+      setPotWinnerSelections({});
+    }
+  }, [game?.status, game?.betting_round]);
+
   async function startNewHand(first_hand: boolean, playersForHand: Player[] = players) {
     if (!game || playersForHand.length < 2) return;
 
@@ -144,10 +158,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     const smallBlindAmount = Math.min(game.small_blind, smallBlindPlayer.chips);
     const bigBlindAmount = Math.min(game.big_blind, bigBlindPlayer.chips);
 
-      // Update players
+    // Update players
     const { error: smallBlindError } = await supabase
       .from("players")
-      .update({chips: smallBlindPlayer.chips - smallBlindAmount, current_bet: smallBlindAmount,})
+      .update({chips: smallBlindPlayer.chips - smallBlindAmount, current_bet: smallBlindAmount, total_contribution: smallBlindPlayer.total_contribution + smallBlindAmount})
       .eq("id", smallBlindPlayer.id);
 
     if (smallBlindError) {
@@ -157,7 +171,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     const { error: bigBlindError } = await supabase
       .from("players")
-      .update({chips: bigBlindPlayer.chips - bigBlindAmount, current_bet: bigBlindAmount,})
+      .update({chips: bigBlindPlayer.chips - bigBlindAmount, current_bet: bigBlindAmount, total_contribution: bigBlindPlayer.total_contribution + bigBlindAmount})
       .eq("id", bigBlindPlayer.id);
 
     if (bigBlindError) {
@@ -265,25 +279,28 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     })));
   }
 
+  async function skipToShowdown() {
+    if (!game) return;
+    const {error} = await supabase
+      .from("games")
+      .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
+      .eq("id", game.id);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
+  }
+
   async function progressToNextPlayer(currentPlayerId: string, currentBet: number, updatedPlayers: Player[] = players) {
     if (!game) return;
 
     const activePlayers = updatedPlayers.filter((p) => p.active);
     const playersInHand = activePlayers.filter((p) => !p.folded);
     if (playersInHand.length === 1) {
-      // const winner = playersInHand[0]; // last remaining player wins
-
       // Switch to showdown so host can select the last player as the winner
-      const {error} = await supabase
-        .from("games")
-        .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
-        .eq("id", game.id);
-
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      setGame((prevGame) => prevGame ? {...prevGame, betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null,} : null);
+      await skipToShowdown();
       return;
     }
     // Use active players, since the current player might have folded
@@ -294,10 +311,20 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Look for the next active player who has not matched the current bet or still needs to act
-    for (let i = 1; i <= playersInHand.length; i++) {
-      const nextPlayer = playersInHand[(currentIndex + i) % playersInHand.length];
+    const playersWhoCanAct = playersInHand.filter((p) => (!p.all_in && p.active && !p.folded));
+    if (playersWhoCanAct.length === 0) {
+      await skipToShowdown();
+      return;
+    }
 
+    // Look for the next player who can act (and has not matched the current bet or still needs to act)
+    for (let i = 1; i <= activePlayers.length; i++) {
+      const nextPlayer = activePlayers[(currentIndex + i) % activePlayers.length];
+
+      // if player is all-in, folded or inactive he is just skipped
+      if (nextPlayer.all_in || !nextPlayer.active || nextPlayer.folded) {
+        continue;
+      }
       if (nextPlayer.current_bet < currentBet || !nextPlayer.has_acted) {
         const { error } = await supabase
           .from("games")
@@ -322,14 +349,24 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     try {
       const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
       const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
-      const chipsToCall = game.current_bet - currentBet;
+      let chipsToCall = game.current_bet - currentBet;
       if (chipsToCall <= 0) return;
+      
+      let allIn = false
+      if (chipsToCall >= currentChipCount) {
+        chipsToCall = currentChipCount; // dont allow calling to go beyond what the player has  
+        allIn = true;
+      }
       const newChipCount = currentChipCount - chipsToCall;
+
     
       // Update the player's chips in the DB
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: game.current_bet, has_acted: true })
+        .update({ chips: newChipCount, current_bet: currentBet + chipsToCall,
+          has_acted: true,
+          all_in: allIn,
+          total_contribution: currentPlayer.total_contribution + chipsToCall})
         .eq("id", currentPlayerId);
 
     if (player_error) {
@@ -436,12 +473,18 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     try {
       const currentChipCount = players.find((p) => p.id === currentPlayerId)?.chips ?? 0;
-      const newChipCount = currentChipCount - raise_amount;
+      const currentBet = players.find((p) => p.id === currentPlayerId)?.current_bet ?? 0;
+      const chipsToMatch = game.current_bet - currentBet;
+
+      const newChipCount = currentChipCount - chipsToMatch - raise_amount;
       const newCurrentBet = game.current_bet + raise_amount;
+      const newTotalContribution = currentBet + chipsToMatch + raise_amount;
+
+      const allIn = newChipCount === 0;
 
       const { error: player_error } = await supabase
         .from("players")
-        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true })
+        .update({ chips: newChipCount, current_bet: newCurrentBet, has_acted: true, total_contribution: newTotalContribution, all_in: allIn })
         .eq("id", currentPlayerId);
 
       if (player_error) {
@@ -449,7 +492,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         return;
       }
 
-      const newPot = game.pot + raise_amount;
+      const newPot = game.pot + chipsToMatch + raise_amount;
       const { error: pot_error } = await supabase
         .from("games")
         .update({ pot: newPot, current_bet: newCurrentBet })
@@ -481,11 +524,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Reset each player's current bet, folded status, and has_acted status
+    // Reset each player's current bet, folded status, all-in status, total_contribution and has_acted status
     for (const player of players) {
       const { error: playerError } = await supabase
         .from("players")
-        .update({ current_bet: 0, folded: false, has_acted: false })
+        .update({ current_bet: 0, folded: false, has_acted: false, total_contribution: 0, all_in: false})
         .eq("id", player.id);
 
       if (playerError) {
@@ -513,63 +556,120 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     setGame((prevGame) => prevGame ? { ...prevGame, pot: 0, betting_round: 0, current_bet: 0, current_player: prevGame.current_dealer } : null);
     
     // Update local copy of the players state
-    setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
+    setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false, all_in: false })));
 
     if (game.status == "playing") { 
       await startNewHand(false, freshPlayers);
     } 
   }
 
-  async function chooseWinner(winnerId: string) {
+  function buildPots(players: Player[]): Pot[] {
+    const contributions = players
+      .map((p) => ({id: p.id, contributed: p.total_contribution, folded: p.folded}))
+      .filter((p) => p.contributed > 0);
+
+    if (contributions.length === 0) {
+      return [];
+    }
+
+    const levels : number[] = [...new Set(contributions.map((p) => p.contributed))].sort((a, b) => a - b);
+    const pots: Pot[] = [];
+    let previousLevel = 0;
+    
+    for (const level of levels) {
+      const amountAtLevel = level - previousLevel;
+
+      const contributors = contributions.filter((p) => p.contributed >= level);
+      const amount = amountAtLevel * contributors.length;
+      const eligiblePlayers = contributors.filter((p) => !p.folded).map((p) => p.id);
+      
+      if (amount > 0) {
+        const lastPot = pots[pots.length - 1];
+
+        // Check if the last pot had the same eligible players
+        const sameEligiblePlayers = lastPot && lastPot.eligiblePlayerIds.length === eligiblePlayers.length &&
+          lastPot.eligiblePlayerIds.every((id) => eligiblePlayers.includes(id));
+        
+        if (sameEligiblePlayers) {
+          lastPot.amount += amount; // if yes, just expand the last pot
+        } else {
+          pots.push({amount, eligiblePlayerIds: eligiblePlayers});
+        }
+      }
+
+      previousLevel = level;
+    }
+
+    return pots;
+  }
+
+  async function awardPots() {
     if (!game) return;
 
-    // Only host can choose the winner
+    // Only host can choose the winners
     if (currentPlayerId !== game.host) {
-      setError("Only the host can choose the winner.");
+      setError("Only the host can award the pots.");
       return;
     }
 
-    // Do not trust Reacts data, instead fetch the latests values from the DB
-    const {data: freshGame, error: freshGameError} = await supabase
-      .from("games")
-      .select("*")
-      .eq("id", game.id)
-      .single();
-
-    if (freshGameError || !freshGame) {
-      setError(freshGameError?.message ?? "Could not get current game.");
-      return;
-    }
-
-    const {data: freshWinner, error: freshWinnerError} = await supabase
+     // Do not trust Reacts data, instead fetch the latests values from the DB
+    const { data: freshPlayers, error: freshPlayersError } = await supabase
       .from("players")
       .select("*")
-      .eq("id", winnerId)
-      .single();
+      .eq("game_id", game.id)
+      .order("created_at", { ascending: true });
 
-    if (freshWinnerError || !freshWinner) {
-      setError(freshWinnerError?.message ?? "Winner not found.");
+    if (freshPlayersError || !freshPlayers) {
+      setError(freshPlayersError?.message ?? "Could not load players for the pot payout.");
       return;
     }
 
-    if (freshWinner.folded || !freshWinner.active) {
-      setError("Cannot choose a folded or inactive player as the winner.");
+    const pots = buildPots(freshPlayers);
+
+    if (pots.length === 0) {
+      await resetGame();
       return;
     }
 
-    // Update the winner's chips in the DB
-    const newChipCount = freshWinner.chips + freshGame.pot;
-    const { error: player_error } = await supabase
-      .from("players")
-      .update({ chips: newChipCount })
-      .eq("id", winnerId);
+    for (let potIndex = 0; potIndex < pots.length; potIndex++) {
+      const pot = pots[potIndex];
+      const winnerId = potWinnerSelections[potIndex];
 
-    if (player_error) {
-      setError(player_error.message);
-      return;
+      if (!winnerId || !pot.eligiblePlayerIds.includes(winnerId)) {
+        setError(`Select a winner for pot ${potIndex + 1}.`);
+        return;
+      }
+
+      const winner = freshPlayers.find((player) => player.id === winnerId);
+
+      if (!winner || winner.folded || !winner.active) {
+        setError("Cannot award a pot to a folded or inactive player.");
+        return;
+      }
+      
+      // Update the winner's chips in the DB
+      const winnerIndex = freshPlayers.findIndex((player) => player.id === winnerId);
+      const updatedChipCount = freshPlayers[winnerIndex].chips + pot.amount;
+
+      const { error: playerError } = await supabase
+        .from("players")
+        .update({ chips: updatedChipCount })
+        .eq("id", winnerId);
+
+      if (playerError) {
+        setError(playerError.message);
+        return;
+      }
+
+      freshPlayers[winnerIndex] = { ...freshPlayers[winnerIndex], chips: updatedChipCount };
     }
     // Reset the game for the next round
     await resetGame();
+  }
+
+  function selectPotWinner(potIndex: number, winnerId: string) {
+    setPotWinnerSelections((prev) => ({ ...prev, [potIndex]: winnerId }));
+    setError("");
   }
     
 
@@ -604,6 +704,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   }
 
   const pot = game?.pot ?? 0;
+  const showdownPots = buildPots(players);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
   const isMyTurn = currentPlayer?.id === game?.current_player && !currentPlayer?.folded && currentPlayer?.active;
@@ -708,18 +809,28 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       )}
 
       <div className="winner-selection">
-        {game.status === "playing"  && isShowdown && isHost && (
+        {game.status === "playing" && isShowdown && isHost && showdownPots.length > 0 && (
           <div className="winner-picker">
-            <h2>Choose the winner</h2>
-            {playersInHand.map((player) => (
-              <button
-                key={player.id}
-                className="winner-button"
-                onClick={() => chooseWinner(player.id)}
-              >
-                {player.name} ({player.chips.toLocaleString()} chips)
-              </button>
+            <h2>Award the pots</h2>
+            {showdownPots.map((potItem, index) => (
+              <div key={`${potItem.amount}-${index}`} className="pot-award">
+                <h3>Pot {index + 1}: {potItem.amount.toLocaleString()} chips</h3>
+                {playersInHand
+                  .filter((player) => potItem.eligiblePlayerIds.includes(player.id))
+                  .map((player) => (
+                    <button
+                      key={player.id}
+                      className={`winner-button ${potWinnerSelections[index] === player.id ? "winner-selected" : ""}`}
+                      onClick={() => selectPotWinner(index, player.id)}
+                    >
+                      {player.name} ({player.chips.toLocaleString()} chips)
+                    </button>
+                  ))}
+              </div>
             ))}
+            <button className="start-game-button" onClick={awardPots}>
+              Award pots
+            </button>
           </div>
         )}
       </div>
@@ -728,6 +839,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         {players.map((player) => {
           const isMe = player.id === currentPlayerId;
           const isCurrentPlayer = player.id === game.current_player;
+          const chipsToMatch = game.current_bet - player.current_bet;
 
           return (
             <article
@@ -779,9 +891,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                 <button
                   className="call-button"
                   onClick={call}
-                  disabled={player.chips < game.current_bet}
+                  // Dont disable to allow all-ins (which the call function can handle)
+                  // disabled={player.chips < (game.current_bet - player.current_bet)}
                 >
-                  Call {game.current_bet - player.current_bet}
+                  {player.chips > (game.current_bet - player.current_bet)
+                      ? `Call ${game.current_bet - player.current_bet}`
+                      : `All in ${player.chips}`}
                 </button>
               )}
 
@@ -798,7 +913,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
               <button
                 className="raise-button"
                 onClick={() => raise(chipAmount)}
-                disabled={player.chips < chipAmount}
+                disabled={player.chips < (chipsToMatch + chipAmount)}
               >
                 Raise by {chipAmount}
               </button>
