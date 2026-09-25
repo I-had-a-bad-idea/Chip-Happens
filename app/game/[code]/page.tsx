@@ -505,11 +505,11 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
-    // Reset each player's current bet, folded status, total_contribution and has_acted status
+    // Reset each player's current bet, folded status, all-in status, total_contribution and has_acted status
     for (const player of players) {
       const { error: playerError } = await supabase
         .from("players")
-        .update({ current_bet: 0, folded: false, has_acted: false, total_contribution: 0})
+        .update({ current_bet: 0, folded: false, has_acted: false, total_contribution: 0, all_in: false})
         .eq("id", player.id);
 
       if (playerError) {
@@ -537,7 +537,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     setGame((prevGame) => prevGame ? { ...prevGame, pot: 0, betting_round: 0, current_bet: 0, current_player: prevGame.current_dealer } : null);
     
     // Update local copy of the players state
-    setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false })));
+    setPlayers((prevPlayers) => prevPlayers.map((p) => ({ ...p, current_bet: 0, folded: false, has_acted: false, all_in: false })));
 
     if (game.status == "playing") { 
       await startNewHand(false, freshPlayers);
