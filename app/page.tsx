@@ -16,6 +16,7 @@ export default function Home() {
   const [buyIn, setBuyIn] = useState(1000);
   const [smallBlind, setSmallBlind] = useState(10);
   const [bigBlind, setBigBlind] = useState(20);
+  const [seatPosition, setSeatPosition] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,6 +57,7 @@ export default function Home() {
       .insert({
         game_id: game.id,
         name: name.trim(),
+        seat_position: seatPosition,
         chips: buyIn,
       })
       .select()
@@ -137,6 +139,13 @@ export default function Home() {
           placeholder="e.g. 20"
           min="1"
         />
+
+        <label>Your seat</label>
+        <select value={seatPosition} onChange={(e) => setSeatPosition(Number(e.target.value))}>
+          {Array.from({ length: 10 }, (_, index) => index + 1).map((seat) => (
+            <option key={seat} value={seat}>Seat {seat}</option>
+          ))}
+        </select>
 
         {error && <div className="error">{error}</div>}
 

@@ -54,6 +54,8 @@ create table players (
     game_id uuid not null references games(id) on delete cascade,
     name text not null,
 
+    seat_position integer not null,
+
     active boolean not null default true,
     chips integer not null default 0,
     current_bet integer not null default 0,
@@ -67,9 +69,12 @@ create table players (
 
 create index players_game_id_idx
     on players(game_id);
+
+create unique index players_game_seat_position_idx
+    on players(game_id, seat_position);
 ```
 
-4. Enable realtime for the tables
+1. Enable realtime for the tables
 
 ```sql
 alter publication supabase_realtime
