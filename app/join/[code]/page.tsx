@@ -1,8 +1,10 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
+const SEAT_COUNT = 10;
 
 export default function JoinPage({params,}: {params: Promise<{ code: string }>;}) {
   const router = useRouter();
@@ -10,8 +12,45 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
   const { code } = use(params);
 
   const [name, setName] = useState("");
+  const [seatPosition, setSeatPosition] = useState(1);
+  const [occupiedSeats, setOccupiedSeats] = useState<number[]>([]);
+  const [loadingSeats, setLoadingSeats] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadOccupiedSeats() {
+      const { data: game, error: gameError } = await supabase
+        .from("games")
+        .select("id")
+        .eq("code", code.toUpperCase())
+        .single();
+
+      if (gameError || !game) {
+        setError("Game not found.");
+        setLoadingSeats(false);
+        return;
+      }
+
+      const { data: players, error: playersError } = await supabase
+        .from("players")
+        .select("seat_position")
+        .eq("game_id", game.id);
+
+      if (playersError) {
+        setError(playersError.message);
+      } else {
+        const seats = (players ?? []).map((player) => player.seat_position);
+        setOccupiedSeats(seats);
+        const firstOpenSeat = Array.from({ length: SEAT_COUNT }, (_, index) => index + 1)
+          .find((seat) => !seats.includes(seat));
+        if (firstOpenSeat) setSeatPosition(firstOpenSeat);
+      }
+      setLoadingSeats(false);
+    }
+
+    loadOccupiedSeats();
+  }, [code]);
 
   async function joinGame() {
     // Ensure all data exists
@@ -42,12 +81,31 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
+    const { data: currentPlayers, error: currentPlayersError } = await supabase
+      .from("players")
+      .select("seat_position")
+      .eq("game_id", game.id);
+
+    if (currentPlayersError) {
+      setError(currentPlayersError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (currentPlayers.some((player) => player.seat_position === seatPosition)) {
+      setOccupiedSeats(currentPlayers.map((player) => player.seat_position));
+      setError("That seat was just taken. Choose another seat.");
+      setLoading(false);
+      return;
+    }
+
     // Give the joining player the game's buy-in
     const { data: player, error: playerError } = await supabase
       .from("players")
       .insert({
         game_id: game.id,
         name: name.trim(),
+        seat_position: seatPosition,
         chips: game.buy_in,
       })
       .select()
@@ -85,10 +143,25 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
         }}
         />
 
+        <label>Your seat</label>
+        <select
+          value={seatPosition}
+          onChange={(e) => setSeatPosition(Number(e.target.value))}
+          disabled={loadingSeats || loading}
+        >
+          {Array.from({ length: SEAT_COUNT }, (_, index) => index + 1).map((seat) => (
+            <option key={seat} value={seat} disabled={occupiedSeats.includes(seat)}>
+              Seat {seat}{occupiedSeats.includes(seat) ? " (taken)" : ""}
+            </option>
+          ))}
+        </select>
+
+        {error && <div className="error">{error}</div>}
+
         <button
         className="primary-button"
         onClick={joinGame}
-        disabled={loading}
+        disabled={loading || loadingSeats || occupiedSeats.length >= SEAT_COUNT}
         >
         {loading ? "Joining..." : "Join game"}
         </button>

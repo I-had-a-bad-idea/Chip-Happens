@@ -8,6 +8,7 @@ type Player = {
   id: string;
   game_id: string;
   name: string;
+  seat_position: number;
 
   active: boolean;
   chips: number;
@@ -78,12 +79,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     setGame(gameData);
 
-    // Get all players inside the game (sorted by creation date)
+    // Seat order determines table order and turn order.
     const { data: playerData, error: playerError } = await supabase
       .from("players")
       .select("*")
       .eq("game_id", gameData.id)
-      .order("created_at", { ascending: true });
+      .order("seat_position", { ascending: true });
 
     if (playerError) {
       setError(playerError.message);
@@ -214,7 +215,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     if (!game) return;
 
     const activePlayers = players.filter((p) => p.active);
-    const playersInHand = activePlayers.filter((p) => !p.folded);
 
     const nextBettingRound = game.betting_round + 1;
     let nextPlayer: string | null = null;
@@ -231,8 +231,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       // Post-Flop the small blind is the first player to act
       // Starting with the small blind, search for an eligible player
-      for (let i = 1; i <= playersInHand.length; i++) {
-        const player = playersInHand[(dealerIndex + i) % playersInHand.length];
+      for (let i = 1; i <= activePlayers.length; i++) {
+        const player = activePlayers[(dealerIndex + i) % activePlayers.length];
 
         // The first eligible player acts first
         if (player.active && !player.folded) {
@@ -542,7 +542,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       .from("players")
       .select("*")
       .eq("game_id", game.id)
-      .order("created_at", { ascending: true });
+      .order("seat_position", { ascending: true });
 
     if (freshPlayersError || !freshPlayers) {
       setError(freshPlayersError?.message ?? "Could not reload players.");
@@ -617,7 +617,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       .from("players")
       .select("*")
       .eq("game_id", game.id)
-      .order("created_at", { ascending: true });
+      .order("seat_position", { ascending: true });
 
     if (freshPlayersError || !freshPlayers) {
       setError(freshPlayersError?.message ?? "Could not load players for the pot payout.");
@@ -849,6 +849,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
               <div className="player-top">
                 <div>
                   <div className="player-name">
+                    <span className="player-seat">SEAT {player.seat_position}</span>
                     {player.name}
 
                     {isMe && (
