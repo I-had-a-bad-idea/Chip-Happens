@@ -565,6 +565,11 @@ input:focus {
   opacity: 0.5;
 }
 
+.player-folded,
+.player-all_in {
+  opacity: 0.75;
+}
+
 .player-inactive .player-name::after {
   content: " INACTIVE";
   margin-left: 8px;

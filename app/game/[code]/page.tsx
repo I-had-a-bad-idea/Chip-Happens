@@ -843,7 +843,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
           return (
             <article
-              className={`player ${isMe ? "player-me" : ""} ${!player.active ? "player-inactive": ""}`}
+              className={`player ${isMe ? "player-me" : ""}
+                ${!player.active ? "player-inactive": ""} ${player.folded ? "player-folded" : ""} ${player.all_in ? "player-all_in": ""}`}
               key={player.id}
             >
               <div className="player-top">
