@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+const SEAT_COUNT = 10;
+
 function generateGameCode() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
@@ -142,7 +144,7 @@ export default function Home() {
 
         <label>Your seat</label>
         <select value={seatPosition} onChange={(e) => setSeatPosition(Number(e.target.value))}>
-          {Array.from({ length: 10 }, (_, index) => index + 1).map((seat) => (
+          {Array.from({ length: SEAT_COUNT }, (_, index) => index + 1).map((seat) => (
             <option key={seat} value={seat}>Seat {seat}</option>
           ))}
         </select>
