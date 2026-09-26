@@ -81,12 +81,31 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
       return;
     }
 
+    const { data: currentPlayers, error: currentPlayersError } = await supabase
+      .from("players")
+      .select("seat_position")
+      .eq("game_id", game.id);
+
+    if (currentPlayersError) {
+      setError(currentPlayersError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (currentPlayers.some((player) => player.seat_position === seatPosition)) {
+      setOccupiedSeats(currentPlayers.map((player) => player.seat_position));
+      setError("That seat was just taken. Choose another seat.");
+      setLoading(false);
+      return;
+    }
+
     // Give the joining player the game's buy-in
     const { data: player, error: playerError } = await supabase
       .from("players")
       .insert({
         game_id: game.id,
         name: name.trim(),
+        seat_position: seatPosition,
         chips: game.buy_in,
       })
       .select()
@@ -124,10 +143,25 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
         }}
         />
 
+        <label>Your seat</label>
+        <select
+          value={seatPosition}
+          onChange={(e) => setSeatPosition(Number(e.target.value))}
+          disabled={loadingSeats || loading}
+        >
+          {Array.from({ length: SEAT_COUNT }, (_, index) => index + 1).map((seat) => (
+            <option key={seat} value={seat} disabled={occupiedSeats.includes(seat)}>
+              Seat {seat}{occupiedSeats.includes(seat) ? " (taken)" : ""}
+            </option>
+          ))}
+        </select>
+
+        {error && <div className="error">{error}</div>}
+
         <button
         className="primary-button"
         onClick={joinGame}
-        disabled={loading}
+        disabled={loading || loadingSeats || occupiedSeats.length >= SEAT_COUNT}
         >
         {loading ? "Joining..." : "Join game"}
         </button>
