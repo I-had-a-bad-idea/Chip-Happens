@@ -58,7 +58,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
-  const [potWinnerSelections, setPotWinnerSelections] = useState<Record<number, string>>({});
+  const [potWinnerSelections, setPotWinnerSelections] = useState<Record<number, string[]>>({});
   const actionInFlight = useRef(false);
 
   async function loadGame() {
@@ -124,12 +124,6 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     return () => {supabase.removeChannel(channel);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
-
-  useEffect(() => {
-    if (game?.status === "playing" && game?.betting_round === BETTING_ROUND_NAMES.length - 1) {
-      setPotWinnerSelections({});
-    }
-  }, [game?.status, game?.betting_round]);
 
   async function startNewHand(first_hand: boolean, playersForHand: Player[] = players) {
     if (!game || playersForHand.length < 2) return;
@@ -281,6 +275,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   async function skipToShowdown() {
     if (!game) return;
+    setPotWinnerSelections({});
+
     const {error} = await supabase
       .from("games")
       .update({betting_round: BETTING_ROUND_NAMES.length - 1, current_player: null})
@@ -633,42 +629,56 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
     for (let potIndex = 0; potIndex < pots.length; potIndex++) {
       const pot = pots[potIndex];
-      const winnerId = potWinnerSelections[potIndex];
+      const winnerIds = potWinnerSelections[potIndex] ?? [];
 
-      if (!winnerId || !pot.eligiblePlayerIds.includes(winnerId)) {
-        setError(`Select a winner for pot ${potIndex + 1}.`);
+      if (winnerIds.length === 0 || winnerIds.some((winnerId) => !pot.eligiblePlayerIds.includes(winnerId))) {
+        setError(`Select at least one winner for pot ${potIndex + 1}.`);
         return;
       }
 
-      const winner = freshPlayers.find((player) => player.id === winnerId);
+      const winners = winnerIds
+        .map((winnerId) => freshPlayers.find((player) => player.id === winnerId))
+        .filter((winner): winner is Player => Boolean(winner));
 
-      if (!winner || winner.folded || !winner.active) {
+      if (winners.length !== winnerIds.length || winners.some((winner) => winner.folded || !winner.active)) {
         setError("Cannot award a pot to a folded or inactive player.");
         return;
       }
-      
-      // Update the winner's chips in the DB
-      const winnerIndex = freshPlayers.findIndex((player) => player.id === winnerId);
-      const updatedChipCount = freshPlayers[winnerIndex].chips + pot.amount;
 
-      const { error: playerError } = await supabase
-        .from("players")
-        .update({ chips: updatedChipCount })
-        .eq("id", winnerId);
+      const chipsPerWinner = Math.floor(pot.amount / winners.length);
+      const remainder = pot.amount % winners.length;
 
-      if (playerError) {
-        setError(playerError.message);
-        return;
+      winners.sort((a, b) => a.seat_position - b.seat_position);
+      for (const [winnerIndex, winner] of winners.entries()) {
+        const playerIndex = freshPlayers.findIndex((player) => player.id === winner.id);
+        const updatedChipCount = winner.chips + chipsPerWinner + (winnerIndex < remainder ? 1 : 0);
+
+        const { error: playerError } = await supabase
+          .from("players")
+          .update({ chips: updatedChipCount })
+          .eq("id", winner.id);
+
+        if (playerError) {
+          setError(playerError.message);
+          return;
+        }
+
+        freshPlayers[playerIndex] = { ...freshPlayers[playerIndex], chips: updatedChipCount };
       }
-
-      freshPlayers[winnerIndex] = { ...freshPlayers[winnerIndex], chips: updatedChipCount };
     }
     // Reset the game for the next round
     await resetGame();
   }
 
   function selectPotWinner(potIndex: number, winnerId: string) {
-    setPotWinnerSelections((prev) => ({ ...prev, [potIndex]: winnerId }));
+    setPotWinnerSelections((prev) => {
+      const selectedWinners = prev[potIndex] ?? [];
+      const nextWinners = selectedWinners.includes(winnerId)
+        ? selectedWinners.filter((id) => id !== winnerId)
+        : [...selectedWinners, winnerId];
+
+      return { ...prev, [potIndex]: nextWinners };
+    });
     setError("");
   }
     
@@ -811,7 +821,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       <div className="winner-selection">
         {game.status === "playing" && isShowdown && isHost && showdownPots.length > 0 && (
           <div className="winner-picker">
-            <h2>Award the pots</h2>
+            <h2>Select pot winner(s)</h2>
             {showdownPots.map((potItem, index) => (
               <div key={`${potItem.amount}-${index}`} className="pot-award">
                 <h3>Pot {index + 1}: {potItem.amount.toLocaleString()} chips</h3>
@@ -820,8 +830,9 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                   .map((player) => (
                     <button
                       key={player.id}
-                      className={`winner-button ${potWinnerSelections[index] === player.id ? "winner-selected" : ""}`}
+                      className={`winner-button ${potWinnerSelections[index]?.includes(player.id) ? "winner-selected" : ""}`}
                       onClick={() => selectPotWinner(index, player.id)}
+                      aria-pressed={potWinnerSelections[index]?.includes(player.id)}
                     >
                       {player.name} ({player.chips.toLocaleString()} chips)
                     </button>
