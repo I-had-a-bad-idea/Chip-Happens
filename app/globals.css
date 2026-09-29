@@ -96,6 +96,12 @@ h1 {
   line-height: 1.5;
 }
 
+.home-card h2 {
+  position: relative;
+  margin: 16px 0 4px;
+  line-height: 1.25;
+}
+
 label {
   display: block;
   margin-top: 8px;
@@ -119,8 +125,13 @@ input {
 }
 
 input:focus {
-  border-color: #777f91;
-  box-shadow: 0 0 0 3px rgba(119, 127, 145, 0.12);
+  border-color: #66c7ad;
+  box-shadow: 0 0 0 3px rgba(102, 199, 173, 0.14);
+}
+
+.home-card input:hover:not(:focus),
+.home-card select:hover:not(:focus) {
+  border-color: #515b68;
 }
 
 .primary-button,
@@ -533,7 +544,7 @@ input:focus {
   flex-wrap: wrap;
   gap: 6px;
 
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 600;
 }
 
@@ -557,12 +568,17 @@ input:focus {
 
 .player-seat {
   color: #8f98aa;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 570;
 }
 
 .player-inactive {
   opacity: 0.5;
+}
+
+.player-folded,
+.player-all_in {
+  opacity: 0.75;
 }
 
 .player-inactive .player-name::after {

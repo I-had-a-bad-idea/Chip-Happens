@@ -843,7 +843,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
           return (
             <article
-              className={`player ${isMe ? "player-me" : ""} ${!player.active ? "player-inactive": ""}`}
+              className={`player ${isMe ? "player-me" : ""}
+                ${!player.active ? "player-inactive": ""} ${player.folded ? "player-folded" : ""} ${player.all_in ? "player-all_in": ""}`}
               key={player.id}
             >
               <div className="player-top">
@@ -860,6 +861,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
                     )}
                     {(game.status === "playing" && !isMe && isCurrentPlayer) && (
                       <span className="player-badge">Thinking about going all-in...</span>
+                    )}
+                    {(game.status === "playing" && player.folded) && (
+                      <span className="player-badge">FOLDED</span>
+                    )}
+                    {(game.status === "playing" && player.all_in) && (
+                      <span className="player-badge">ALL-IN</span>
                     )}
                   </div>
 
