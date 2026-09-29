@@ -279,7 +279,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
         const player = activePlayers[(dealerIndex + i) % activePlayers.length];
 
         // The first eligible player acts first
-        if (player.active && !player.folded) {
+        if (player.active && !player.folded && !player.all_in) {
           nextPlayer = player.id;
           break;
         }
@@ -546,6 +546,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       if (pot_error) {
         setError(pot_error.message);
+        return;
       }
 
       const updatedPlayers = players.map((player) => player.id === currentPlayerId
@@ -611,7 +612,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
   function buildPots(players: Player[]): Pot[] {
     const contributions = players
-      .map((p) => ({id: p.id, contributed: p.total_contribution, folded: p.folded}))
+      .map((p) => ({id: p.id, contributed: p.total_contribution, folded: p.folded, active: p.active}))
       .filter((p) => p.contributed > 0);
 
     if (contributions.length === 0) {
@@ -627,7 +628,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
 
       const contributors = contributions.filter((p) => p.contributed >= level);
       const amount = amountAtLevel * contributors.length;
-      const eligiblePlayers = contributors.filter((p) => !p.folded).map((p) => p.id);
+      const eligiblePlayers = contributors.filter((p) => !p.folded && p.active).map((p) => p.id);
       
       if (amount > 0) {
         const lastPot = pots[pots.length - 1];
