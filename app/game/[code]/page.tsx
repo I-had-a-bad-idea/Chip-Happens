@@ -205,10 +205,10 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     await startNewHand(true);
   }
 
-  async function progressToNextBettingRound() {
+  async function progressToNextBettingRound(playersForRound: Player[] = players) {
     if (!game) return;
 
-    const activePlayers = players.filter((p) => p.active);
+    const activePlayers = playersForRound.filter((p) => p.active);
 
     const nextBettingRound = game.betting_round + 1;
     let nextPlayer: string | null = null;
@@ -335,7 +335,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     }
 
     // Everyone has matched the current bet, progress to next betting round
-    await progressToNextBettingRound();
+    await progressToNextBettingRound(updatedPlayers);
   }
 
   async function call() {
