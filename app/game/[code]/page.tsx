@@ -57,45 +57,57 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [syncWarning, setSyncWarning] = useState("");
   const [chipAmount, setChipAmount] = useState(100);
   const [potWinnerSelections, setPotWinnerSelections] = useState<Record<number, string[]>>({});
   const actionInFlight = useRef(false);
+  const loadInFlight = useRef(false);
 
   async function loadGame() {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     const gameCode = code.toUpperCase();
 
-    // Get the game data
-    const { data: gameData, error: gameError } = await supabase
-      .from("games")
-      .select("*")
-      .eq("code", gameCode)
-      .single();
+    try {
+      const { data: gameData, error: gameError } = await supabase
+        .from("games")
+        .select("*")
+        .eq("code", gameCode)
+        .single();
 
-    if (gameError || !gameData) {
-      setError("Game not found.");
+      if (gameError || !gameData) {
+        if (gameError?.code === "PGRST116" || !gameError) {
+          setError("Game not found.");
+        } else {
+          setSyncWarning("Connection issue. Retrying sync...");
+        }
+        setLoading(false);
+        return;
+      }
+
+      const { data: playerData, error: playerError } = await supabase
+        .from("players")
+        .select("*")
+        .eq("game_id", gameData.id)
+        .order("seat_position", { ascending: true });
+
+      setGame(gameData);
+      if (playerError) {
+        setSyncWarning("Connection issue. Retrying sync...");
+      } else {
+        setPlayers(playerData ?? []);
+        setSyncWarning("");
+      }
+
+      const storedPlayerId = localStorage.getItem(`poker-player-${gameCode}`);
+      setCurrentPlayerId(storedPlayerId);
       setLoading(false);
-      return;
+    } catch {
+      setSyncWarning("Connection issue. Retrying sync...");
+      setLoading(false);
+    } finally {
+      loadInFlight.current = false;
     }
-
-    setGame(gameData);
-
-    // Seat order determines table order and turn order.
-    const { data: playerData, error: playerError } = await supabase
-      .from("players")
-      .select("*")
-      .eq("game_id", gameData.id)
-      .order("seat_position", { ascending: true });
-
-    if (playerError) {
-      setError(playerError.message);
-    } else {
-      setPlayers(playerData ?? []);
-    }
-
-    const storedPlayerId = localStorage.getItem(`poker-player-${gameCode}`);
-
-    setCurrentPlayerId(storedPlayerId);
-    setLoading(false);
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
@@ -774,7 +786,8 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
     return (
       <main className="game-page">
         <div className="game-card">
-          <h1>Game not found</h1>
+          <h1>{syncWarning ? "Reconnecting to game..." : "Game not found"}</h1>
+          {syncWarning && <p role="status">{syncWarning}</p>}
           <button
             className="secondary-button"
             onClick={() => router.push("/")}
@@ -814,6 +827,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       </header>
 
       {error && <div className="error game-error">{error}</div>}
+      {syncWarning && <div className="error game-error" role="status">{syncWarning}</div>}
 
       <section className="summary">
         <div>
