@@ -102,6 +102,23 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   useEffect(() => {loadGame();}, [code]);
 
   useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadGame();
+    };
+    const refreshWhenOnline = () => loadGame();
+    const refreshInterval = window.setInterval(loadGame, 5000);
+    window.addEventListener("online", refreshWhenOnline);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("online", refreshWhenOnline);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
+  useEffect(() => {
     if (!game) return;
 
     // Subscribe to the game, regarding changes in the player table
@@ -119,9 +136,30 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
           loadGame();
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "games",
+          filter: `id=eq.${game.id}`,
+        },
+        () => {
+          loadGame();
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setSyncWarning("");
+          loadGame();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setSyncWarning("Connection issue. Retrying sync...");
+        }
+      });
 
-    return () => {supabase.removeChannel(channel);};
+    return () => {
+      supabase.removeChannel(channel);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
