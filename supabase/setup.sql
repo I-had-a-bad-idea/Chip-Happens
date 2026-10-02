@@ -40,7 +40,7 @@ alter publication supabase_realtime add table public.games;
 
 create or replace function public.create_game(
     p_code text,
-    p_name text, p_seat_position integer
+    p_name text, p_seat_position integer,
     p_buy_in integer, p_small_blind integer, p_big_blind integer
 ) returns uuid
 language plpgsql
