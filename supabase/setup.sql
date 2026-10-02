@@ -69,3 +69,52 @@ begin
     return v_player_id;
 end;
 $$;
+
+create or replace function public.get_join_seats(p_code text)
+returns integer[]
+language plpgsql stable
+as $$
+declare
+    v_game_id uuid;
+    v_seats integer[];
+begin
+    select id into v_game_id from public.games where code = upper(p_code);
+    if v_game_id is null then
+        raise exception 'Game not found.';
+    end if;
+
+    select coalesce(array_agg(seat_position order by seat_position), '{}'::integer[])
+    into v_seats from public.players where game_id = v_game_id;
+    return v_seats;
+end;
+$$;
+
+create or replace function public.join_game(
+    p_code text,
+    p_name text,
+    p_seat_position integer
+) returns uuid
+language plpgsql
+as $$
+declare
+    v_game public.games%rowtype;
+    v_player_id uuid;
+begin
+    if trim(p_name) = '' or p_seat_position not between 1 and 10 then
+        raise exception 'Enter a name and choose a valid seat.';
+    end if;
+
+    select * into v_game from public.games where code = upper(p_code) for update;
+    if not found then
+        raise exception 'Game not found.';
+    end if;
+    if exists (select 1 from public.players where game_id = v_game.id and seat_position = p_seat_position) then
+        raise exception 'That seat was just taken. Choose another seat.';
+    end if;
+
+    insert into public.players(game_id, name, seat_position, chips)
+    values (v_game.id, trim(p_name), p_seat_position, v_game.buy_in)
+    returning id into v_player_id;
+    return v_player_id;
+end;
+$$;
