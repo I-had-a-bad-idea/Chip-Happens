@@ -35,56 +35,23 @@ export default function Home() {
     const gameCode = generateGameCode();
 
     // Create the game with the selected buy-in and blinds
-    const { data: game, error: gameError } = await supabase
-      .from("games")
-      .insert({
-        code: gameCode,
-        buy_in: buyIn,
-        small_blind: smallBlind,
-        big_blind: bigBlind
-      })
-      .select()
-      .single();
+    const { data: playerId, error: createError } = await supabase.rpc("create_game", {
+      p_code: gameCode,
+      p_name: name.trim(),
+      p_seat_position: seatPosition,
+      p_buy_in: buyIn,
+      p_small_blind: smallBlind,
+      p_big_blind: bigBlind,
+    });
 
     // Error handling
-    if (gameError || !game) {
-      setError(gameError?.message ?? "Could not create game.");
+    if (createError || !playerId) {
+      setError(createError?.message ?? "Could not create game.");
       setLoading(false);
       return;
     }
 
-    // Give the host the selected buy-in
-    const { data: player, error: playerError } = await supabase
-      .from("players")
-      .insert({
-        game_id: game.id,
-        name: name.trim(),
-        seat_position: seatPosition,
-        chips: buyIn,
-      })
-      .select()
-      .single();
-
-    // Error handling
-    if (playerError || !player) {
-      setError(playerError?.message ?? "Could not create player.");
-      setLoading(false);
-      return;
-    }
-
-    // Set the current dealer for the game to the host player and set the current player as the host of the game
-    const { error: dealerError } = await supabase
-      .from("games")
-      .update({ host: player.id, current_dealer: player.id, current_player: player.id }) // TODO: Don't just set the current player to the host
-      .eq("id", game.id);
-
-    if (dealerError) {
-      setError(dealerError.message ?? "Could not set dealer.");
-      setLoading(false);
-      return;
-    }
-
-    localStorage.setItem(`poker-player-${gameCode}`, player.id);
+    localStorage.setItem(`poker-player-${gameCode}`, playerId);
 
     // Change to the game tab
     router.push(`/game/${gameCode}`);
