@@ -295,3 +295,176 @@ $$;
 
 revoke all on function public._chip_happens_start_hand(uuid, boolean) from public;
 revoke all on function public._chip_happens_advance(uuid, uuid) from public;
+
+create or replace function public.game_action(
+    p_code text,
+    p_actor_id uuid,
+    p_action text,
+    p_amount integer default null,
+    p_target_player_id uuid default null,
+    p_winners jsonb default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+    v_game public.games%rowtype;
+    v_player public.players%rowtype;
+    v_eligible uuid[];
+    v_selected uuid[];
+    v_previous_eligible jsonb;
+    v_pot_amounts integer[] := '{}'::integer[];
+    v_pot_eligible jsonb[];
+    v_pot_index integer := 0;
+    v_level integer;
+    v_previous_level integer := 0;
+    v_contributors integer;
+    v_amount integer;
+    v_share integer;
+    v_remainder integer;
+    v_winner_index integer;
+    v_winner record;
+begin
+    select * into v_game from public.games where code = upper(p_code) for update;
+    if not found then
+        raise exception 'Game not found.';
+    end if;
+
+    if p_action in ('start', 'award', 'toggle_active', 'remove_player') then
+        if p_actor_id is distinct from v_game.host then
+            raise exception 'Only the host can perform this action.';
+        end if;
+    else
+        if p_actor_id is distinct from v_game.current_player then
+            raise exception 'It is not your turn.';
+        end if;
+    end if;
+
+    if p_action = 'start' then
+        if v_game.status <> 'waiting' then raise exception 'Game has already started.'; end if;
+        perform public._chip_happens_start_hand(v_game.id, true);
+    elsif p_action in ('call', 'check', 'fold', 'raise') then
+        select * into v_player from public.players where id = p_actor_id and game_id = v_game.id for update;
+        if not found or not v_player.active or v_player.folded or v_game.status <> 'playing' or v_game.betting_round >= 4 then
+            raise exception 'Player cannot act in this game state.';
+        end if;
+
+        if p_action = 'fold' then
+            update public.players set folded = true, has_acted = true where id = p_actor_id;
+        elsif p_action = 'check' then
+            if v_player.current_bet < v_game.current_bet then raise exception 'You must call or fold.'; end if;
+            update public.players set has_acted = true where id = p_actor_id;
+        elsif p_action = 'call' then
+            v_amount := least(greatest(v_game.current_bet - v_player.current_bet, 0), v_player.chips);
+            if v_amount = 0 then raise exception 'There is no bet to call.'; end if;
+            update public.players
+            set chips = chips - v_amount,
+                current_bet = current_bet + v_amount,
+                total_contribution = total_contribution + v_amount,
+                has_acted = true,
+                all_in = chips - v_amount = 0
+            where id = p_actor_id;
+            update public.games set pot = pot + v_amount where id = v_game.id;
+        else
+            if p_amount is null or p_amount <= 0 then raise exception 'Raise must be greater than zero.'; end if;
+            v_amount := v_game.current_bet - v_player.current_bet + p_amount;
+            if v_amount > v_player.chips then raise exception 'Raise exceeds your chip stack.'; end if;
+            update public.players
+            set chips = chips - v_amount,
+                current_bet = current_bet + v_amount,
+                total_contribution = total_contribution + v_amount,
+                has_acted = true,
+                all_in = chips - v_amount = 0
+            where id = p_actor_id;
+            update public.players set has_acted = false
+            where game_id = v_game.id and id <> p_actor_id and active and not folded and not all_in;
+            update public.games set pot = pot + v_amount, current_bet = v_game.current_bet + p_amount where id = v_game.id;
+        end if;
+        perform public._chip_happens_advance(v_game.id, p_actor_id);
+    elsif p_action = 'toggle_active' then
+        if v_game.status = 'playing' and v_game.betting_round < 4 then
+            raise exception 'Players can only be made inactive between hands.';
+        end if;
+        update public.players set active = not active
+        where id = p_target_player_id and game_id = v_game.id;
+        if not found then raise exception 'Player not found.'; end if;
+    elsif p_action = 'remove_player' then
+        delete from public.players where id = p_target_player_id and game_id = v_game.id;
+        if not found then raise exception 'Player not found.'; end if;
+    elsif p_action = 'award' then
+        if v_game.status <> 'playing' or v_game.betting_round <> 4 then raise exception 'The game is not at showdown.'; end if;
+
+        for v_level in
+            select distinct total_contribution from public.players
+            where game_id = v_game.id and total_contribution > 0 order by total_contribution
+        loop
+            select count(*) into v_contributors from public.players
+            where game_id = v_game.id and total_contribution >= v_level;
+            v_amount := (v_level - v_previous_level) * v_contributors;
+            select coalesce(array_agg(id order by seat_position), '{}'::uuid[])
+            into v_eligible from public.players
+            where game_id = v_game.id and total_contribution >= v_level and active and not folded;
+
+            if v_pot_index > 0 and to_jsonb(v_eligible) = v_previous_eligible then
+                v_pot_amounts[v_pot_index] := v_pot_amounts[v_pot_index] + v_amount;
+            else
+                v_pot_index := v_pot_index + 1;
+                v_pot_amounts := array_append(v_pot_amounts, v_amount);
+                v_pot_eligible := array_append(v_pot_eligible, to_jsonb(v_eligible));
+            end if;
+            v_previous_eligible := to_jsonb(v_eligible);
+            v_previous_level := v_level;
+        end loop;
+
+        if coalesce(jsonb_array_length(p_winners), 0) <> v_pot_index then
+            if v_pot_index > 0 then raise exception 'Select winners for every pot.'; end if;
+        end if;
+
+        for v_pot_index in 1..coalesce(array_length(v_pot_amounts, 1), 0) loop
+            select array_agg(value::uuid) into v_selected
+            from jsonb_array_elements_text(p_winners -> (v_pot_index - 1)) as winner(value);
+            if coalesce(array_length(v_selected, 1), 0) = 0
+                    or cardinality(v_selected) <> (select count(distinct winner_id) from unnest(v_selected) as selected(winner_id))
+               or exists (
+                   select 1 from unnest(v_selected) as selected(winner_id)
+                   where not exists (
+                       select 1 from jsonb_array_elements_text(v_pot_eligible[v_pot_index]) eligible(player_id)
+                       where eligible.player_id::uuid = selected.winner_id
+                   )
+               ) then
+                raise exception 'Invalid winner selection for pot %.', v_pot_index;
+            end if;
+
+            v_share := v_pot_amounts[v_pot_index] / array_length(v_selected, 1);
+            v_remainder := v_pot_amounts[v_pot_index] % array_length(v_selected, 1);
+            v_winner_index := 0;
+            for v_winner in
+                select id from public.players
+                where id = any(v_selected) and game_id = v_game.id order by seat_position
+            loop
+                v_winner_index := v_winner_index + 1;
+                update public.players set chips = chips + v_share + case when v_winner_index <= v_remainder then 1 else 0 end
+                where id = v_winner.id;
+            end loop;
+        end loop;
+
+        update public.players
+        set current_bet = 0, folded = false, has_acted = false,
+            total_contribution = 0, all_in = false
+        where game_id = v_game.id;
+        update public.games
+        set pot = 0, betting_round = 0, current_bet = 0,
+            current_player = current_dealer
+        where id = v_game.id;
+
+        if v_game.status = 'playing' and (select count(*) from public.players where game_id = v_game.id and active) >= 2 then
+            perform public._chip_happens_start_hand(v_game.id, false);
+        end if;
+    else
+        raise exception 'Unknown game action.';
+    end if;
+
+    return public.get_game(upper(p_code));
+end;
+$$;
