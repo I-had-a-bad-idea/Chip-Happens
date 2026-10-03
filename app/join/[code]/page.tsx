@@ -20,27 +20,13 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
 
   useEffect(() => {
     async function loadOccupiedSeats() {
-      const { data: game, error: gameError } = await supabase
-        .from("games")
-        .select("id")
-        .eq("code", code.toUpperCase())
-        .single();
+      const { data: seats, error: seatsError } = await supabase.rpc("get_join_seats", {
+        p_code: code.toUpperCase(),
+      });
 
-      if (gameError || !game) {
-        setError("Game not found.");
-        setLoadingSeats(false);
-        return;
-      }
-
-      const { data: players, error: playersError } = await supabase
-        .from("players")
-        .select("seat_position")
-        .eq("game_id", game.id);
-
-      if (playersError) {
-        setError(playersError.message);
+      if (seatsError || !seats) {
+        setError(seatsError?.message ?? "Game not found.");
       } else {
-        const seats = (players ?? []).map((player) => player.seat_position);
         setOccupiedSeats(seats);
         const firstOpenSeat = Array.from({ length: SEAT_COUNT }, (_, index) => index + 1)
           .find((seat) => !seats.includes(seat));
@@ -68,56 +54,23 @@ export default function JoinPage({params,}: {params: Promise<{ code: string }>;}
     setLoading(true);
     setError("");
 
-    // Get the game
-    const { data: game, error: gameError } = await supabase
-      .from("games")
-      .select("id, buy_in")
-      .eq("code", code)
-      .single();
+    // Join the game
+    const { data: playerId, error: playerError } = await supabase.rpc("join_game", {
+      p_code: code.toUpperCase(),
+      p_name: name.trim(),
+      p_seat_position: seatPosition,
+    });
 
-    if (gameError || !game) {
-      setError("Game not found.");
-      setLoading(false);
-      return;
-    }
-
-    const { data: currentPlayers, error: currentPlayersError } = await supabase
-      .from("players")
-      .select("seat_position")
-      .eq("game_id", game.id);
-
-    if (currentPlayersError) {
-      setError(currentPlayersError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (currentPlayers.some((player) => player.seat_position === seatPosition)) {
-      setOccupiedSeats(currentPlayers.map((player) => player.seat_position));
-      setError("That seat was just taken. Choose another seat.");
-      setLoading(false);
-      return;
-    }
-
-    // Give the joining player the game's buy-in
-    const { data: player, error: playerError } = await supabase
-      .from("players")
-      .insert({
-        game_id: game.id,
-        name: name.trim(),
-        seat_position: seatPosition,
-        chips: game.buy_in,
-      })
-      .select()
-      .single();
-
-    if (playerError || !player) {
+    if (playerError || !playerId) {
+      if (playerError?.message.includes("seat")) {
+        setOccupiedSeats((seats) => seats.includes(seatPosition) ? seats : [...seats, seatPosition]);
+      }
       setError(playerError?.message ?? "Could not join game.");
       setLoading(false);
       return;
     }
 
-    localStorage.setItem(`poker-player-${code}`, player.id);
+    localStorage.setItem(`poker-player-${code.toUpperCase()}`, playerId);
 
     // Switch to game
     router.push(`/game/${code}`);
