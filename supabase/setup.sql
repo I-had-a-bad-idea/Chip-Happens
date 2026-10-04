@@ -15,6 +15,17 @@ create table public.games (
     current_bet integer not null default 0,
     current_player uuid,
     created_at timestamptz not null default now()
+
+    constraint games_code_length_chk check (char_length(code) between 4 and 12),
+    constraint games_buy_in_chk check (buy_in between 1 and 1000000),
+
+    constraint games_small_blind_chk check (small_blind between 1 and 100000),
+    constraint games_big_blind_chk check (big_blind between 1 and 200000 and big_blind >= small_blind),
+
+    constraint games_status_chk check (status in ('waiting', 'playing', 'finished')),
+    constraint games_betting_round_chk check (betting_round between 0 and 4),
+    constraint games_pot_chk check (pot >= 0),
+    constraint games_current_bet_chk check (current_bet >= 0)
 );
 
 create table public.players (
@@ -30,10 +41,37 @@ create table public.players (
     folded boolean not null default false,
     all_in boolean not null default false,
     created_at timestamptz not null default now()
+
+
+    constraint players_name_chk check (char_length(trim(name)) between 1 and 50),
+    constraint players_seat_position_chk check (seat_position between 1 and 10),
+
+    constraint players_chips_chk check (chips >= 0),
+    constraint players_current_bet_chk check (current_bet >= 0),
+    constraint players_total_contribution_chk check (total_contribution >= 0)
 );
 
 create index players_game_id_idx on public.players(game_id);
 create unique index players_game_seat_position_idx on public.players(game_id, seat_position);
+
+
+alter table public.games
+    add constraint games_host_fk
+    foreign key (host)
+    references public.players(id)
+    on delete set null;
+
+alter table public.games
+    add constraint games_current_dealer_fk
+    foreign key (current_dealer)
+    references public.players(id)
+    on delete set null;
+
+alter table public.games
+    add constraint games_current_player_fk
+    foreign key (current_player)
+    references public.players(id)
+    on delete set null;
 
 alter publication supabase_realtime add table public.players;
 alter publication supabase_realtime add table public.games;
@@ -49,10 +87,34 @@ declare
     v_game_id uuid;
     v_player_id uuid;
 begin
-    if trim(p_name) = '' or p_seat_position not between 1 and 10 or p_buy_in <= 0
-       or p_small_blind <= 0 or p_big_blind < p_small_blind then
-        raise exception 'Invalid game or player details.';
+    if trim(p_code) = '' then
+        raise exception 'Game code is required.';
     end if;
+
+    if trim(p_name) = '' or char_length(trim(p_name)) > 50 then
+        raise exception 'Player name must be between 1 and 50 characters.';
+    end if;
+
+    if p_seat_position not between 1 and 10 then
+        raise exception 'Seat position must be between 1 and 10.';
+    end if;
+
+    if p_buy_in not between 1 and 1000000 then
+        raise exception 'Buy-in must be between 1 and 1,000,000.';
+    end if;
+
+    if p_small_blind not between 1 and 100000 then
+        raise exception 'Small blind must be between 1 and 100,000.';
+    end if;
+
+    if p_big_blind not between 1 and 200000 then
+        raise exception 'Big blind must be between 1 and 200,000.';
+    end if;
+
+    if p_big_blind < p_small_blind then
+        raise exception 'Big blind must be at least the small blind.';
+    end if;
+
 
     insert into public.games(code, buy_in, small_blind, big_blind)
     values (upper(p_code), p_buy_in, p_small_blind, p_big_blind)
@@ -100,13 +162,20 @@ declare
     v_game public.games%rowtype;
     v_player_id uuid;
 begin
-    if trim(p_name) = '' or p_seat_position not between 1 and 10 then
-        raise exception 'Enter a name and choose a valid seat.';
+    if trim(p_name) = '' or char_length(trim(p_name)) > 50 then
+        raise exception 'Player name must be between 1 and 50 characters.';
+    end if;
+
+    if p_seat_position not between 1 and 10 then
+        raise exception 'Seat position must be between 1 and 10.';
     end if;
 
     select * into v_game from public.games where code = upper(p_code) for update;
     if not found then
         raise exception 'Game not found.';
+    end if;
+    if v_game.status <> 'waiting' then
+        raise exception 'This game has already started.';
     end if;
     if exists (select 1 from public.players where game_id = v_game.id and seat_position = p_seat_position) then
         raise exception 'That seat was just taken. Choose another seat.';
@@ -450,8 +519,12 @@ begin
         end loop;
 
         update public.players
-        set current_bet = 0, folded = false, has_acted = false,
-            total_contribution = 0, all_in = false
+        set active = case when chips > 0 then active else false end,
+            current_bet = 0,
+            folded = false,
+            has_acted = false,
+            total_contribution = 0,
+            all_in = false
         where game_id = v_game.id;
         update public.games
         set pot = 0, betting_round = 0, current_bet = 0,
