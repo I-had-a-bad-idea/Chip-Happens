@@ -35,6 +35,25 @@ create table public.players (
 create index players_game_id_idx on public.players(game_id);
 create unique index players_game_seat_position_idx on public.players(game_id, seat_position);
 
+
+alter table public.games
+    add constraint games_host_fk
+    foreign key (host)
+    references public.players(id)
+    on delete set null;
+
+alter table public.games
+    add constraint games_current_dealer_fk
+    foreign key (current_dealer)
+    references public.players(id)
+    on delete set null;
+
+alter table public.games
+    add constraint games_current_player_fk
+    foreign key (current_player)
+    references public.players(id)
+    on delete set null;
+
 alter publication supabase_realtime add table public.players;
 alter publication supabase_realtime add table public.games;
 
