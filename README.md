@@ -4,6 +4,10 @@ A simple poker chip counting system for when you have cards but no chips.
 Find the prod deployment here:
 https://chip-happens.vercel.app/
 
+## Idea
+
+This website has been made, because some friends and I often ran into the problem of not having any chips, but wanting to play Poker with real cards. Since most websites either make you play with digital cards or have a pot where anyone can put chips in/ take them out at any time, I decided to make my own. This website allows you to join a shared game, that only tracks chips. It allows/forces you to use your own cards. And it doesnt allow anyone to put/take arbitary amounts of money into/from the pot.
+
 ## Locally
 
 Get the environemnt keys for the Supabase DB and put them in `.env.local`.
@@ -26,3 +30,11 @@ npm run dev
 
 5. Create a Vercel project
 6. Add your Supabase env variables to the project (`NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
+
+## Important notes/ limitations
+
+Since this website was made to play with friends it is not espicially secure. It **trusts the clients**, meaning if someone wanted, he could just rewrite his client to cheat. This is not a problem for us, since we are all to lazy to do that, but be aware, that it is possible.
+Also I didn't put to much focus on securing the DB, so anyone is probably able to change the values (which shouldnt be a problem (see above), but be warned).
+
+Furthermore there is no enforcement of a minimum raise size (raises can be as low as just 1 chip). Raising also always reopens action (even if it maybe shouldnt according to the official rules).
+For heads-up poker (2 players) the blinds are switched (dealer is big blind), which is because I am too lazy to fix it and we never play with only 2 players.
