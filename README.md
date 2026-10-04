@@ -8,6 +8,8 @@ https://chip-happens.vercel.app/
 - [Chip-Happens](#chip-happens)
   - [Overview](#overview)
   - [Idea](#idea)
+  - [Screenshots](#screenshots)
+  - [Using](#using)
   - [Running](#running)
     - [Requirements](#requirements)
       - [Settign up the DB](#settign-up-the-db)
@@ -25,6 +27,26 @@ https://chip-happens.vercel.app/
 This website has been made, because some friends and I often ran into the problem of not having any chips, but wanting to play Poker with real cards.       
 Since most websites either make you play with digital cards or have a pot where anyone can put chips in/ take them out at any time, I decided to make my own.       
 This website allows you to join a shared game, that only tracks chips. It allows/forces you to use your own cards. And it doesnt allow anyone to put/take arbitary amounts of money into/from the pot.
+
+## Screenshots
+
+| Home | Join Game |
+|:---:|:---:|
+| <img src="images/Home%20page.png" width="300"> | <img src="images/Join%20game%20page.png" width="300"> |
+
+| Waiting for Players | Playing |
+|:---:|:---:|
+| <img src="images/Game%20page%20waiting.png" width="300"> | <img src="images/Game%20page%20playing.png" width="300"> |
+
+| Winner Selection | |
+|:---:|:---:|
+| <img src="images/Game%20page%20winner%20selection.png" width="300"> | |
+
+
+
+## Using
+It should be pretty self-explanatory.       
+Host is responsible for winner selection. To do ties, just select multiple people.      
 
 ## Running
 
