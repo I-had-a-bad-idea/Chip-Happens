@@ -30,18 +30,13 @@ This website allows you to join a shared game, that only tracks chips. It allows
 
 ## Screenshots
 
-| Home | Join Game |
-|:---:|:---:|
-| <img src="images/Home%20page.png" width="300"> | <img src="images/Join%20game%20page.png" width="300"> |
+| Home | Join Game | Waiting for Players |
+|:---:|:---:|:---:|
+| <img src="images/Home%20page.png" width="300"> | <img src="images/Join%20game%20page.png" width="300"> | <img src="images/Game%20page%20waiting.png" width="300"> |
 
-| Waiting for Players | Playing |
+| Playing | Winner Selection |
 |:---:|:---:|
-| <img src="images/Game%20page%20waiting.png" width="300"> | <img src="images/Game%20page%20playing.png" width="300"> |
-
-| Winner Selection | |
-|:---:|:---:|
-| <img src="images/Game%20page%20winner%20selection.png" width="300"> | |
-
+| <img src="images/Game%20page%20playing.png" width="300"> | <img src="images/Game%20page%20winner%20selection.png" width="300"> | 
 
 
 ## Using
