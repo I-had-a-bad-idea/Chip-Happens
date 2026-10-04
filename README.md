@@ -4,13 +4,42 @@ A simple poker chip counting system for when you have cards but no chips.
 Find the prod deployment here:
 https://chip-happens.vercel.app/
 
+## Overview
+- [Chip-Happens](#chip-happens)
+  - [Overview](#overview)
+  - [Idea](#idea)
+  - [Running](#running)
+    - [Requirements](#requirements)
+      - [Settign up the DB](#settign-up-the-db)
+    - [Locally](#locally)
+    - [How to deploy to prod (Vercel)](#how-to-deploy-to-prod-vercel)
+  - [Important notes/ limitations](#important-notes-limitations)
+
+
 ## Idea
 
-This website has been made, because some friends and I often ran into the problem of not having any chips, but wanting to play Poker with real cards. Since most websites either make you play with digital cards or have a pot where anyone can put chips in/ take them out at any time, I decided to make my own. This website allows you to join a shared game, that only tracks chips. It allows/forces you to use your own cards. And it doesnt allow anyone to put/take arbitary amounts of money into/from the pot.
+This website has been made, because some friends and I often ran into the problem of not having any chips, but wanting to play Poker with real cards.       
+Since most websites either make you play with digital cards or have a pot where anyone can put chips in/ take them out at any time, I decided to make my own.       
+This website allows you to join a shared game, that only tracks chips. It allows/forces you to use your own cards. And it doesnt allow anyone to put/take arbitary amounts of money into/from the pot.
 
-## Locally
+## Running
 
-Get the environemnt keys for the Supabase DB and put them in `.env.local`.
+### Requirements
+You will need a Supabase project and Node.js
+
+#### Settign up the DB
+1. Create a Supabase account + project
+2. Get the Supabase URL and Publishable key (Settings -- API Keys)
+3. In the Supabase SQL Editor, run [`supabase/setup.sql`](supabase/setup.sql). This recreates the empty game tables and installs the RPC functions used for all database reads and writes.
+
+### Locally
+
+Get the environemnt keys for the Supabase DB and put them in `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
 
 Installing Dependencies
 ```bash
@@ -23,13 +52,11 @@ Running:
 npm run dev
 ```
 
-## How to deploy to prod
-1. Create a Supabase account + project
-2. Get the Supabase URL and Publishable key (Settings -- API Keys)
-3. In the Supabase SQL Editor, run [`supabase/setup.sql`](supabase/setup.sql). This recreates the empty game tables and installs the RPC functions used for all database reads and writes.
-
-5. Create a Vercel project
-6. Add your Supabase env variables to the project (`NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
+### How to deploy to prod (Vercel)
+1. Setup the Supabase DB (see above)
+2. Create a Vercel project (should be NextJS)
+3. Add your Supabase env variables to the project (`NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`)
+4. Deploy
 
 ## Important notes/ limitations
 
