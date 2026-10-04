@@ -14,6 +14,10 @@ https://chip-happens.vercel.app/
     - [Locally](#locally)
     - [How to deploy to prod (Vercel)](#how-to-deploy-to-prod-vercel)
   - [Important notes/ limitations](#important-notes-limitations)
+    - [Client trust](#client-trust)
+    - [DB security](#db-security)
+    - [Poker rules](#poker-rules)
+  - [Contributing](#contributing)
 
 
 ## Idea
@@ -60,8 +64,20 @@ npm run dev
 
 ## Important notes/ limitations
 
-Since this website was made to play with friends it is not espicially secure. It **trusts the clients**, meaning if someone wanted, he could just rewrite his client to cheat. This is not a problem for us, since we are all to lazy to do that, but be aware, that it is possible.
+Since this website was made to play with friends it is not espicially secure.
+
+### Client trust
+It **trusts the clients**, meaning if someone wanted, he could just rewrite his client to cheat. This is not a problem for us, since we are all to lazy to do that, but be aware, that it is possible.
+
+### DB security
 Also I didn't put to much focus on securing the DB, so anyone is probably able to change the values (which shouldnt be a problem (see above), but be warned).
 
-Furthermore there is no enforcement of a minimum raise size (raises can be as low as just 1 chip). Raising also always reopens action (even if it maybe shouldnt according to the official rules).
+### Poker rules
+There is no enforcement of a minimum raise size (raises can be as low as just 1 chip).      
+Raising also always reopens action (even if it maybe shouldnt according to the official rules).     
 For heads-up poker (2 players) the blinds are switched (dealer is big blind), which is because I am too lazy to fix it and we never play with only 2 players.
+
+## Contributing
+This project is just a small tool for playing Poker with friends, but improvements are welcome.
+
+Just open an issue/PR if you find a bug, have an idea or want to improve it.
