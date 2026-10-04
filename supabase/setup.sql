@@ -450,8 +450,12 @@ begin
         end loop;
 
         update public.players
-        set current_bet = 0, folded = false, has_acted = false,
-            total_contribution = 0, all_in = false
+        set active = case when chips > 0 then active else false end,
+            current_bet = 0,
+            folded = false,
+            has_acted = false,
+            total_contribution = 0,
+            all_in = false
         where game_id = v_game.id;
         update public.games
         set pot = 0, betting_round = 0, current_bet = 0,
