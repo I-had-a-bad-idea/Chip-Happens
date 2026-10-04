@@ -109,7 +109,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
       if (document.visibilityState === "visible") loadGame();
     };
     const refreshWhenOnline = () => loadGame();
-    const refreshInterval = window.setInterval(loadGame, 5000);
+    const refreshInterval = window.setInterval(loadGame, 30000);
     window.addEventListener("online", refreshWhenOnline);
     document.addEventListener("visibilitychange", refreshWhenVisible);
 
@@ -124,6 +124,12 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
   useEffect(() => {
     if (!game) return;
 
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(loadGame, 150);
+    };
+
     // Subscribe to the game, regarding changes in the player table
     const channel = supabase
       .channel(`game-${game.id}`)
@@ -135,9 +141,7 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
           table: "players",
           filter: `game_id=eq.${game.id}`,
         },
-        () => {
-          loadGame();
-        }
+        scheduleRefresh
       )
       .on(
         "postgres_changes",
@@ -147,20 +151,18 @@ export default function GamePage({params,}: {params: Promise<{ code: string }>;}
           table: "games",
           filter: `id=eq.${game.id}`,
         },
-        () => {
-          loadGame();
-        }
+        scheduleRefresh
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           setSyncWarning("");
-          loadGame();
         } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setSyncWarning("Connection issue. Retrying sync...");
         }
       });
 
     return () => {
+      window.clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
